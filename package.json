@@ -63,6 +63,7 @@
     "./docket-serve": "./docket-serve.ts",
     "./docket-types": "./docket-types.ts",
     "./docket-order": "./docket-order.ts",
+    "./docket-resolve": "./docket-resolve.ts",
     "./docket-events": "./docket-events.ts",
     "./docket-state": "./docket-state.ts",
     "./spec/docket-1.vectors.json": "./spec/docket-1.vectors.json"
