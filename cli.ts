@@ -3,6 +3,8 @@
  * mechanics CLI — `bun mechanics <command> [opts]` (root script forwards args).
  *
  * Commands:
+ *   init     [--app=<slug>]            Set a repo up: config, corpus skeleton, CI gate,
+ *            [--no-ci|--no-mcp|--no-docket] [--dry-run]   MCP registration, manifest
  *   check    --app=<slug> | --all      Validate corpus + waves + coverage (exit 1 on errors)
  *   build    --app=<slug> | --all      Regenerate committed manifest(s)
  *   build    ... --check               Drift mode: exit 1 if any manifest is stale
@@ -73,6 +75,13 @@ await main();
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   switch (args.command) {
+    case "init": {
+      // Init creates the config the other commands resolve the repo through,
+      // so it has its own flag vocabulary and root resolution.
+      const { runInit } = await import("./init");
+      await runInit(process.argv.slice(3));
+      break;
+    }
     case "check":
       await runCheck(args);
       break;
@@ -715,6 +724,8 @@ function usage() {
       "mechanics — app mechanics corpus tooling",
       "",
       "Usage:",
+      "  bun mechanics init [--app=<slug>] [--dry-run]   Set this repo up: config, corpus",
+      "                [--no-ci] [--no-mcp] [--no-docket] skeleton, CI gate, MCP, manifest",
       "  bun mechanics check --app=<slug> | --all       Validate corpus + waves + coverage",
       "  bun mechanics build --app=<slug> | --all        Regenerate committed manifest(s)",
       "  bun mechanics build --all --check               Drift gate (exit 1 if stale)",

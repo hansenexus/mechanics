@@ -13,6 +13,7 @@ redesign, and the reason it works is that the answer is checkable rather than
 asserted.
 
 ```bash
+mechanics init                     # set a repo up: config, corpus skeleton, CI, MCP
 mechanics check --all              # corpus + waves + coverage
 mechanics build --all --check      # drift gate
 mechanics coverage --app=<slug>    # the table, the gaps, wave rollups
@@ -23,10 +24,22 @@ mechanics run list                 # the docket/1 board
 
 ## Start here
 
-`template/` is a runnable single-app corpus for a fictional backup CLI. It
-ships **no routes and no Convex functions** on purpose, so `generic-glob`
-carries the whole inventory and nothing works by accident of the built-in
-adapters. Copy it, delete the example corpus, write your own.
+```bash
+npm i -D @hansenexus/mechanics && npx mechanics init      # single-app repo
+npx mechanics init --app=<slug>                           # monorepo: apps/<slug>
+```
+
+Init is idempotent (every file is skip-if-exists) and writes the repo config,
+a corpus skeleton, the CI gate matched to your package manager and detected
+adapters, the `.mcp.json` registration, the `.docket/` directory, and the
+committed manifest. `--dry-run` shows the plan; `--no-ci`, `--no-mcp`,
+`--no-docket` opt out. Then replace the starter mechanic with real behaviours —
+`mechanics scaffold --app=<slug>` drafts a stub per unclaimed surface.
+
+`template/` is the readable worked example: a runnable single-app corpus for a
+fictional backup CLI. It ships **no routes and no Convex functions** on
+purpose, so `generic-glob` carries the whole inventory and nothing works by
+accident of the built-in adapters.
 
 ## What is in the box
 
@@ -52,10 +65,10 @@ convenient way around them would be a way of destroying it.
 
 ## Runtime
 
-Bun ≥ 1.2. The package ships TypeScript source and the `mechanics` bin is a
-`.ts` file, so `bunx mechanics` works and `npx mechanics` does not. A compiled
-`dist/` for Node consumers is not built yet — say so rather than discovering it
-at install time.
+The `mechanics` bin is a bundled Node build (`dist/cli.js`), so both
+`npx mechanics` and `bunx mechanics` work with no Bun requirement at use time.
+The package also ships its TypeScript source, importable directly under Bun
+(≥ 1.2), which is what development and the test suite run on.
 
 ## Licence
 

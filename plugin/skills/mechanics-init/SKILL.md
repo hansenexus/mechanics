@@ -22,15 +22,20 @@ the shape before writing any.
 
 ## Preflight (abort if any fails)
 
-1. `mechanics.config.yaml` exists at the repo root and declares `$1`. In a
-   single-app repo the corpus lives at `mechanics/`; in a multi-app repo at
-   `<appsDir>/$1/mechanics/`. Everything below says **`<corpus>`** for that
+1. Structure comes from the CLI, not from hand-authoring: run
+   `mechanics init` (single-app repo) or `mechanics init --app=$1` (monorepo).
+   It is idempotent — on an already-configured repo it skips everything and
+   costs nothing. It writes `mechanics.config.yaml`, `<corpus>/_config.yaml`,
+   the CI gate, the MCP registration and the manifest. Afterwards verify the
+   detected `testGlobs`/`e2eRunner` in `<corpus>/_config.yaml` match the app's
+   real harness (a `playwright` runner also needs `playwrightConfig`), and
+   delete the generated `getting-started/` starter area once real areas exist.
+   In a single-app repo the corpus lives at `mechanics/`; in a multi-app repo
+   at `<appsDir>/$1/mechanics/`. Everything below says **`<corpus>`** for that
    directory — never hardcode either shape.
 2. You are not on the default branch. The corpus lands through pull requests.
-3. If `<corpus>/_config.yaml` is missing, create it (set `testGlobs` and
-   `e2eRunner` to the app's harness; a `playwright` runner also needs
-   `playwrightConfig`), then run `mechanics scaffold --app=$1` for
-   route-derived draft stubs where the app has routes.
+3. Where the app has routes, run `mechanics scaffold --app=$1` for
+   route-derived draft stubs.
 4. Build the **scope table**: from the app's own docs, routes and data model,
    define the areas (kebab-case dirs), each with its surfaces, source hints, an
    expected count band, and an explicit NOT_YOURS list of surfaces owned by
