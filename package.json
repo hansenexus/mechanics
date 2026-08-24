@@ -1,6 +1,6 @@
 {
   "name": "@hansenexus/mechanics",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Behaviour specs with a coverage ratchet: one markdown file per behaviour, a committed manifest, CI-gated against drift, verified per wave. Ships a stdio MCP server and the docket/1 run protocol.",
   "license": "MIT",
   "keywords": [
