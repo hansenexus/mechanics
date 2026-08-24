@@ -1,0 +1,33 @@
+wave: 2026-01-baseline
+title: Baseline verification of the example CLI
+status: open
+startedAt: 2026-01-05
+
+# Empty scope = every non-deprecated mechanic. The scope is LIVE: a mechanic
+# added mid-wave grows the denominator, because a wave verifies the app as it
+# stands, not as it stood when the wave opened.
+scope:
+  areas: []
+  kinds: []
+  ids: []
+  exclude: []
+
+# Absent entry = pending. `pass` requires evidence — that requirement is the
+# whole point of the format, so there is no way to record a green verdict
+# without saying what made it green.
+verifications:
+  - mechanic: example.backups.create-snapshot
+    status: pass
+    method: e2e
+    evidence: e2e/backup.spec.ts
+    verifiedBy: mechanics-cli
+    verifiedAt: 2026-01-05
+
+  - mechanic: example.backups.inspect-status
+    status: fail
+    method: e2e
+    evidence: e2e/backup.spec.ts
+    failedCriteria: [AC3]
+    verifiedBy: mechanics-cli
+    verifiedAt: 2026-01-05
+    note: --json still prints the human header line before the object.

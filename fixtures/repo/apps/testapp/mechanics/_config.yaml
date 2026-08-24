@@ -1,0 +1,10 @@
+testGlobs:
+  - "e2e/**/*.spec.ts"
+e2eRunner: bun-script
+coverage:
+  enforce: warn
+  ignore:
+    route:
+      - "/dev/*"
+    convex-function:
+      - "things.seed*"

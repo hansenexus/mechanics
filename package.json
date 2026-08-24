@@ -1,0 +1,82 @@
+{
+  "name": "@hansenexus/mechanics",
+  "version": "0.1.0",
+  "description": "Behaviour specs with a coverage ratchet: one markdown file per behaviour, a committed manifest, CI-gated against drift, verified per wave. Ships a stdio MCP server and the docket/1 run protocol.",
+  "license": "MIT",
+  "keywords": [
+    "behaviour-specs",
+    "acceptance-criteria",
+    "coverage",
+    "documentation",
+    "mcp",
+    "docket",
+    "agents"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hansenexus/mechanics.git"
+  },
+  "homepage": "https://github.com/hansenexus/mechanics#readme",
+  "bugs": "https://github.com/hansenexus/mechanics/issues",
+  "engines": {
+    "bun": ">=1.2"
+  },
+  "bin": {
+    "mechanics": "./dist/cli.js"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "bun build cli.ts --target=node --outdir=dist --external @modelcontextprotocol/sdk --external gray-matter --external yaml --external zod && node scripts/banner.mjs",
+    "prepublishOnly": "bun run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "*.ts",
+    "!*.test.ts",
+    "!vitest.config.ts",
+    "spec/",
+    "plugin/",
+    "template/",
+    "README.md",
+    "LICENSE",
+    "dist/"
+  ],
+  "exports": {
+    ".": "./index.ts",
+    "./types": "./types.ts",
+    "./schema": "./schema.ts",
+    "./parser": "./parser.ts",
+    "./layout": "./layout.ts",
+    "./adapters": "./adapters.ts",
+    "./discover": "./discover.ts",
+    "./coverage": "./coverage.ts",
+    "./manifest": "./manifest.ts",
+    "./verify": "./verify.ts",
+    "./screens": "./screens.ts",
+    "./report": "./report.ts",
+    "./impact": "./impact.ts",
+    "./docket-serve": "./docket-serve.ts",
+    "./docket-types": "./docket-types.ts",
+    "./docket-order": "./docket-order.ts",
+    "./docket-events": "./docket-events.ts",
+    "./docket-state": "./docket-state.ts",
+    "./spec/docket-1.vectors.json": "./spec/docket-1.vectors.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "gray-matter": "^4.0.3",
+    "yaml": "^2.8.4",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^25.6.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14"
+  }
+}

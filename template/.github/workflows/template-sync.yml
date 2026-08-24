@@ -1,0 +1,74 @@
+name: template-sync
+
+# Pull upstream template changes into this fork as a PR.
+#
+# What this can and cannot do: it syncs the files the template OWNS — the
+# workflows and the docs below. It never touches your `mechanics/` corpus, your
+# `mechanics.config.yaml`, or your source. That split is the whole contract:
+# customisation lives in config and corpus, and everything else can be
+# fast-forwarded without a merge conflict.
+#
+# It opens a PR and stops. It never merges — an upstream change to your CI
+# gates is exactly the kind of thing a human should read first.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays, 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  UPSTREAM: https://github.com/hansenexus/mechanics.git
+  # Paths the template owns. Anything not listed here is yours.
+  SYNCED_PATHS: |
+    .github/workflows/mechanics-check.yml
+    .github/workflows/template-sync.yml
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fetch the upstream template
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --filter=blob:none --sparse "$UPSTREAM" /tmp/upstream
+          git -C /tmp/upstream sparse-checkout set template
+
+      - name: Copy synced paths
+        id: copy
+        run: |
+          set -euo pipefail
+          changed=0
+          while IFS= read -r rel; do
+            [ -z "$rel" ] && continue
+            src="/tmp/upstream/template/$rel"
+            [ -f "$src" ] || continue
+            mkdir -p "$(dirname "$rel")"
+            if ! cmp -s "$src" "$rel"; then
+              cp "$src" "$rel"
+              echo "updated $rel"
+              changed=1
+            fi
+          done <<< "$SYNCED_PATHS"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+      - name: Open a PR
+        if: steps.copy.outputs.changed == '1'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/template-sync
+          title: "chore: sync mechanics template"
+          commit-message: "chore: sync mechanics template"
+          body: |
+            Upstream template changes, copied in verbatim.
+
+            Only template-owned paths are touched — your `mechanics/` corpus,
+            `mechanics.config.yaml` and source are untouched. Read the diff
+            before merging: an upstream change to a CI gate can change what
+            fails on your PRs.
+          delete-branch: true

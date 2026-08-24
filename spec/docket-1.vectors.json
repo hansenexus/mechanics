@@ -1,0 +1,365 @@
+{
+  "proto": "docket/1",
+  "about": "Conformance vectors for docket/1 derived state. Each case is a work order plus the exact JSONL lines of an event log, and the state a conforming reader must derive from them at the given instant. Run them against your own implementation; the reference implementation runs them in packages/mechanics/docket-conformance.test.ts. Only the asserted keys are checked — a reader deriving more state is still conforming.",
+  "cases": [
+    {
+      "name": "a heartbeat does not clear a block",
+      "why": "A heartbeat proves the session is alive, which says nothing about whether the human answered. A reader that lets it clear the block reports a run as working while it sits waiting on someone — the exact failure this protocol exists to prevent.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1"],
+        "phases": ["scope", "implement"]
+      },
+      "now": "2026-01-05T10:00:30.000Z",
+      "events": [
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.000Z",
+          "run": "2026-01-05-example",
+          "seq": 1,
+          "type": "gate.blocked",
+          "actor": { "kind": "agent" },
+          "reason": "which retention window?",
+          "needs": "human"
+        },
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:20.000Z",
+          "run": "2026-01-05-example",
+          "seq": 2,
+          "type": "session.heartbeat",
+          "actor": { "kind": "hook" }
+        }
+      ],
+      "expect": {
+        "liveness": "waiting",
+        "blocked": { "reason": "which retention window?", "needs": "human" }
+      }
+    },
+    {
+      "name": "session.idle does not clear a block either",
+      "why": "An agent that asks a question ends its turn immediately afterwards, so the idle event lands milliseconds after the gate it must not erase. Treating idle as progress would silently unblock every gate the moment it was raised.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1"],
+        "phases": ["scope"]
+      },
+      "now": "2026-01-05T10:00:05.000Z",
+      "events": [
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.000Z",
+          "run": "2026-01-05-example",
+          "seq": 1,
+          "type": "gate.blocked",
+          "actor": { "kind": "agent" },
+          "reason": "needs a decision",
+          "needs": "human"
+        },
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.400Z",
+          "run": "2026-01-05-example",
+          "seq": 2,
+          "type": "session.idle",
+          "actor": { "kind": "hook" },
+          "reason": "turn ended"
+        }
+      ],
+      "expect": { "liveness": "waiting" }
+    },
+    {
+      "name": "any event clears idle, heartbeat included",
+      "why": "The asymmetry with gate.blocked is load bearing. A block is a claim about the HUMAN, so agent activity cannot refute it. Idleness is a claim about the AGENT, so any later event refutes it — a tool ran.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1"],
+        "phases": ["scope"]
+      },
+      "now": "2026-01-05T10:00:40.000Z",
+      "events": [
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.000Z",
+          "run": "2026-01-05-example",
+          "seq": 1,
+          "type": "session.idle",
+          "actor": { "kind": "hook" },
+          "reason": "turn ended"
+        },
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:30.000Z",
+          "run": "2026-01-05-example",
+          "seq": 2,
+          "type": "session.heartbeat",
+          "actor": { "kind": "hook" }
+        }
+      ],
+      "expect": { "liveness": "working" }
+    },
+    {
+      "name": "idleness decays to stalled",
+      "why": "A clean turn end is not a crash and must not render as one; a run nobody came back to is precisely the forgotten work order a board exists to surface. Past the idle window it becomes stalled, which means what it always meant.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1"],
+        "phases": ["scope"]
+      },
+      "now": "2026-01-05T19:00:00.000Z",
+      "events": [
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.000Z",
+          "run": "2026-01-05-example",
+          "seq": 1,
+          "type": "session.idle",
+          "actor": { "kind": "hook" },
+          "reason": "turn ended"
+        }
+      ],
+      "expect": { "liveness": "stalled" }
+    },
+    {
+      "name": "a pass without evidence is not a pass",
+      "why": "Invariant 5, enforced on READ as well as on write. A hand-edited log or a third-party producer must not be able to slip one through.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1"],
+        "phases": ["scope"]
+      },
+      "now": "2026-01-05T10:00:10.000Z",
+      "events": [
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.000Z",
+          "run": "2026-01-05-example",
+          "seq": 1,
+          "type": "criterion.evaluated",
+          "actor": { "kind": "agent" },
+          "criterion": "a:AC1",
+          "verdict": "pass",
+          "method": "agent"
+        }
+      ],
+      "expect": { "progress": { "met": 0, "total": 1 }, "criteria": [] }
+    },
+    {
+      "name": "the latest verdict for a criterion wins",
+      "why": "Append-only means corrections are new events, not edits. A reader that keeps the first verdict, or that counts both, reports a criterion as met after it was found broken.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1"],
+        "phases": ["scope"]
+      },
+      "now": "2026-01-05T10:00:20.000Z",
+      "events": [
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.000Z",
+          "run": "2026-01-05-example",
+          "seq": 1,
+          "type": "criterion.evaluated",
+          "actor": { "kind": "agent" },
+          "criterion": "a:AC1",
+          "verdict": "pass",
+          "method": "e2e",
+          "evidence": "e2e/a.spec.ts"
+        },
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:10.000Z",
+          "run": "2026-01-05-example",
+          "seq": 2,
+          "type": "criterion.evaluated",
+          "actor": { "kind": "human" },
+          "criterion": "a:AC1",
+          "verdict": "fail",
+          "method": "manual"
+        }
+      ],
+      "expect": {
+        "progress": { "met": 0, "total": 1 },
+        "criteria": [{ "criterion": "a:AC1", "verdict": "fail" }]
+      }
+    },
+    {
+      "name": "only criteria named in the order move the denominator",
+      "why": "Anything else that got evaluated is still reported — it just cannot inflate progress. Otherwise a run reaches 3/1 by evaluating things nobody asked for.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1"],
+        "phases": ["scope"]
+      },
+      "now": "2026-01-05T10:00:20.000Z",
+      "events": [
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.000Z",
+          "run": "2026-01-05-example",
+          "seq": 1,
+          "type": "criterion.evaluated",
+          "actor": { "kind": "agent" },
+          "criterion": "b:AC9",
+          "verdict": "pass",
+          "method": "e2e",
+          "evidence": "e2e/b.spec.ts"
+        }
+      ],
+      "expect": {
+        "progress": { "met": 0, "total": 1 },
+        "criteria": [{ "criterion": "b:AC9", "verdict": "pass" }]
+      }
+    },
+    {
+      "name": "n-a counts as met",
+      "why": "A criterion that does not apply is answered, not outstanding. Counting it as pending leaves runs that can never reach 100%.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1", "a:AC2"],
+        "phases": ["scope"]
+      },
+      "now": "2026-01-05T10:00:20.000Z",
+      "events": [
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.000Z",
+          "run": "2026-01-05-example",
+          "seq": 1,
+          "type": "criterion.evaluated",
+          "actor": { "kind": "agent" },
+          "criterion": "a:AC1",
+          "verdict": "n-a",
+          "method": "manual"
+        },
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:10.000Z",
+          "run": "2026-01-05-example",
+          "seq": 2,
+          "type": "criterion.evaluated",
+          "actor": { "kind": "agent" },
+          "criterion": "a:AC2",
+          "verdict": "pass",
+          "method": "e2e",
+          "evidence": "e2e/a.spec.ts"
+        }
+      ],
+      "expect": { "progress": { "met": 2, "total": 2 } }
+    },
+    {
+      "name": "an unknown event type is activity, not an error",
+      "why": "Invariant 3. A newer producer must be able to write into an older consumer's log; an event this reader cannot interpret is still evidence that something is alive.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1"],
+        "phases": ["scope"]
+      },
+      "now": "2026-01-05T10:00:20.000Z",
+      "events": [
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.000Z",
+          "run": "2026-01-05-example",
+          "seq": 1,
+          "type": "phase.entered",
+          "actor": { "kind": "agent" },
+          "phase": "scope"
+        },
+        {
+          "proto": "docket/2",
+          "ts": "2026-01-05T10:00:10.000Z",
+          "run": "2026-01-05-example",
+          "seq": 2,
+          "type": "budget.exhausted",
+          "actor": { "kind": "agent" },
+          "spent": 500000
+        }
+      ],
+      "expect": {
+        "liveness": "working",
+        "phase": "scope",
+        "eventCount": 2,
+        "lastEventAt": "2026-01-05T10:00:10.000Z"
+      }
+    },
+    {
+      "name": "run.finished outranks an outstanding block",
+      "why": "Liveness is first-match-wins in a fixed order. A run closed while blocked is done — reporting it as waiting would keep asking a human for something nobody needs any more.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1"],
+        "phases": ["scope"]
+      },
+      "now": "2026-01-05T10:00:20.000Z",
+      "events": [
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.000Z",
+          "run": "2026-01-05-example",
+          "seq": 1,
+          "type": "gate.blocked",
+          "actor": { "kind": "agent" },
+          "reason": "abandoned",
+          "needs": "human"
+        },
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:10.000Z",
+          "run": "2026-01-05-example",
+          "seq": 2,
+          "type": "run.finished",
+          "actor": { "kind": "human" },
+          "result": "abandoned"
+        }
+      ],
+      "expect": { "liveness": "done", "result": "abandoned" }
+    },
+    {
+      "name": "an empty log is stalled, not working",
+      "why": "A run with an order and no events has never reported anything. Defaulting to working would hide every dispatch that died before its first turn.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1"],
+        "phases": ["scope"]
+      },
+      "now": "2026-01-05T10:00:00.000Z",
+      "events": [],
+      "expect": { "liveness": "stalled", "phase": null, "eventCount": 0, "lastEventAt": null }
+    },
+    {
+      "name": "a claim expires rather than locking",
+      "why": "Invariant 6. In a file-based, eventually-consistent system a lock is a lie, so a lease that has elapsed simply stops being reported.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1"],
+        "phases": ["scope"]
+      },
+      "now": "2026-01-05T11:00:00.000Z",
+      "events": [
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.000Z",
+          "run": "2026-01-05-example",
+          "seq": 1,
+          "type": "run.claimed",
+          "actor": { "kind": "agent", "session": "s1" },
+          "until": "2026-01-05T10:30:00.000Z"
+        }
+      ],
+      "expect": { "claimActive": false }
+    }
+  ]
+}

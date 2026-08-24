@@ -1,0 +1,12 @@
+{
+  "name": "mechanics",
+  "description": "Author, verify and audit a behaviour-spec corpus: onboard an app, run a verification wave, and find documentation gaps. Works in any repo with a mechanics.config.yaml.",
+  "version": "0.1.0",
+  "author": {
+    "name": "hansenexus",
+    "url": "https://github.com/hansenexus/mechanics"
+  },
+  "homepage": "https://github.com/hansenexus/mechanics",
+  "license": "MIT",
+  "keywords": ["mechanics", "behaviour-specs", "coverage", "verification", "docket"]
+}

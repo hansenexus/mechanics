@@ -1,0 +1,22 @@
+# Per-app config. Paths are relative to the app root (here: the repo root).
+
+# Specs scanned for `// @mechanic <id>` annotations and mechanic-prefixed
+# describe titles. Test links are DISCOVERED from these, never declared in
+# frontmatter — a declared link is a second source of truth that rots.
+testGlobs:
+  - "e2e/**/*.spec.ts"
+
+# bun-script | playwright. Playwright additionally needs `playwrightConfig`.
+e2eRunner: bun-script
+
+coverage:
+  # warn while you are still writing the corpus; error once it is complete.
+  # That flip is the ratchet — it is what stops the corpus going stale.
+  enforce: error
+
+  # Surfaces excused from needing a claim, keyed by the same kinds as `claims`.
+  # Underscore-prefixed commands are internal debugging tools, not product
+  # behaviour, so nothing should have to document them.
+  ignore:
+    cli-command:
+      - "src/commands/_*.ts"

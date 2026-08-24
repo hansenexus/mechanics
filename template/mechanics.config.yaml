@@ -1,0 +1,30 @@
+# Where mechanics runs, and how this repo is laid out.
+#
+# The presence of this file marks the repo root — the CLI walks up from the
+# working directory to find it.
+
+# A single-app repo: the app IS the repo. `dir: .` makes every derived path
+# lose the `apps/<slug>/` prefix, so mechanics live at `mechanics/…` rather
+# than `apps/example/mechanics/…`.
+apps:
+  - slug: example
+    dir: .
+
+    # No built-in adapters: this example ships CLI commands and a scheduled
+    # job, not Next.js routes or Convex functions. Add "nextjs-app-router"
+    # and/or "convex" here if yours does.
+    adapters: []
+
+    # Every surface this project ships, found by glob. The kind names are
+    # yours — they become the keys under `claims:` in each mechanic, the
+    # coverage buckets, and the `ignore:` keys in mechanics/_config.yaml.
+    surfaces:
+      - kind: cli-command
+        label: CLI command
+        globs: ["src/commands/*.ts"]
+      - kind: scheduled-job
+        label: scheduled job
+        globs: ["src/jobs/*.ts"]
+
+# Committed, generated, drift-gated in CI. Never hand-edit.
+manifestsDir: .mechanics/manifests

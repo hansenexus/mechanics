@@ -1,0 +1,1 @@
+placeholder — deliberately NOT referenced by index.json (exercises the unreferenced-file warning)

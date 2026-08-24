@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "app": "testapp",
+  "wave": "2026-01-test",
+  "checkpoint": "before",
+  "capturedAt": "2026-01-02",
+  "viewport": "1440x900",
+  "fullPage": false,
+  "baseUrl": "http://localhost:3999",
+  "routes": [
+    {
+      "route": "/ghost",
+      "slug": "ghost",
+      "status": "missing",
+      "reason": "unresolved segment: ghostId (no fixture value)"
+    },
+    {
+      "route": "/thing",
+      "slug": "thing",
+      "file": "thing.webp",
+      "status": "captured",
+      "visitedPath": "/thing"
+    }
+  ]
+}

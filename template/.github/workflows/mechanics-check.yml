@@ -1,0 +1,70 @@
+name: mechanics
+
+# Two gates, and they do different jobs:
+#
+#   validate + drift  — the corpus parses, every claim resolves, and the
+#                       committed manifest matches what the tree produces.
+#   coupling          — a PR that changes a documented surface must also touch
+#                       the corpus. This is the gate that keeps the corpus from
+#                       going stale, which is the failure mode every previous
+#                       attempt at behaviour docs died of.
+#
+# Escape hatch for a surface-only change that genuinely needs no doc update:
+# add the `mechanics-not-needed` label to the PR.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Validate corpus, waves and coverage
+        run: bunx mechanics check --all
+
+      - name: Manifests match the tree
+        run: bunx mechanics build --all --check
+
+  coupling:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Surface changed without a corpus change
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'mechanics-not-needed') }}
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-only "$BASE" "$HEAD")
+
+          # Directories whose contents are documented behaviour. Keep this in
+          # step with the `surfaces:` globs in mechanics.config.yaml.
+          surface=$(echo "$changed" | grep -E '^src/(commands|jobs)/' || true)
+          corpus=$(echo "$changed" | grep -E '^mechanics/' || true)
+
+          if [ -n "$surface" ] && [ -z "$corpus" ]; then
+            echo "::error::This PR changes documented surfaces but no mechanic:"
+            echo "$surface" | sed 's/^/  /'
+            echo "Update apps' mechanics/, or label the PR 'mechanics-not-needed'."
+            exit 1
+          fi
+          echo "ok"

@@ -1,0 +1,19 @@
+wave: 2026-01-test
+title: Fixture wave
+status: open
+startedAt: 2026-01-01
+scope:
+  areas: []
+  kinds: []
+  ids: []
+  exclude: []
+links:
+  previewCategoryIds: []
+  previewDecisions: []
+verifications:
+  - mechanic: testapp.core.nightly-sync
+    status: n-a
+    method: manual
+    evidence: destructive — verified by hand in staging
+    verifiedBy: fixture
+    verifiedAt: 2026-01-02

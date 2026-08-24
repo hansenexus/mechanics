@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 2,
+  "appSlug": "example",
+  "mechanicCount": 4,
+  "surfaces": [
+    {
+      "kind": "cli-command",
+      "label": "CLI command"
+    },
+    {
+      "kind": "scheduled-job",
+      "label": "scheduled job"
+    }
+  ],
+  "areas": [
+    {
+      "slug": "backups",
+      "title": "Backups",
+      "order": 1,
+      "description": "Creating, listing and restoring snapshots.",
+      "mechanicCount": 3
+    },
+    {
+      "slug": "maintenance",
+      "title": "Maintenance",
+      "order": 2,
+      "description": "Scheduled work that keeps the snapshot store healthy.",
+      "mechanicCount": 1
+    }
+  ],
+  "mechanics": [
+    {
+      "id": "example.backups.create-snapshot",
+      "title": "Create a snapshot of a source directory",
+      "kind": "user-facing",
+      "area": "backups",
+      "status": "active",
+      "priority": "p0",
+      "roles": [
+        "operator"
+      ],
+      "claims": {
+        "cli-command": [
+          "src/commands/backup.ts"
+        ]
+      },
+      "paths": [
+        "src/commands/backup.ts"
+      ],
+      "nonFunctional": [
+        "perf"
+      ],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 2,
+      "tests": [
+        {
+          "spec": "e2e/backup.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/backups/create-snapshot.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "example.backups.inspect-status",
+      "title": "List snapshots and store health",
+      "kind": "user-facing",
+      "area": "backups",
+      "status": "active",
+      "priority": "p1",
+      "roles": [
+        "operator"
+      ],
+      "claims": {
+        "cli-command": [
+          "src/commands/status.ts"
+        ]
+      },
+      "paths": [
+        "src/commands/status.ts"
+      ],
+      "nonFunctional": [],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 1,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/backup.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/backups/inspect-status.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "example.backups.restore-snapshot",
+      "title": "Restore a snapshot over a target directory",
+      "kind": "user-facing",
+      "area": "backups",
+      "status": "active",
+      "priority": "p0",
+      "roles": [
+        "operator"
+      ],
+      "claims": {
+        "cli-command": [
+          "src/commands/restore.ts"
+        ]
+      },
+      "paths": [
+        "src/commands/restore.ts"
+      ],
+      "nonFunctional": [],
+      "destructive": true,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 2,
+      "tests": [],
+      "source": "mechanics/backups/restore-snapshot.md",
+      "aliases": [],
+      "verify": "manual-only"
+    },
+    {
+      "id": "example.maintenance.prune-old-snapshots",
+      "title": "Prune snapshots past the retention window",
+      "kind": "system",
+      "area": "maintenance",
+      "status": "active",
+      "priority": "p1",
+      "roles": [
+        "system"
+      ],
+      "claims": {
+        "scheduled-job": [
+          "src/jobs/prune-snapshots.ts"
+        ]
+      },
+      "paths": [
+        "src/jobs/prune-snapshots.ts"
+      ],
+      "nonFunctional": [],
+      "destructive": true,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [],
+      "source": "mechanics/maintenance/prune-old-snapshots.md",
+      "aliases": [],
+      "verify": "agent"
+    }
+  ],
+  "coverage": {
+    "cli-command": {
+      "total": 4,
+      "claimed": 3,
+      "ignored": 1,
+      "unclaimed": []
+    },
+    "scheduled-job": {
+      "total": 1,
+      "claimed": 1,
+      "ignored": 0,
+      "unclaimed": []
+    }
+  },
+  "testCoverage": {
+    "withTests": 2,
+    "manualOnly": 1,
+    "untested": 1
+  }
+}
