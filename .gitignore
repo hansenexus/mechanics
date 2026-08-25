@@ -4,3 +4,6 @@ dist/
 
 # screenshot scratch (scripts/shots.mjs)
 .shots/
+
+# macOS Finder droppings — `open .` in docs/ leaves these
+.DS_Store
