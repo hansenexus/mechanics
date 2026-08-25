@@ -182,10 +182,7 @@ describe("annotate-spec: auto only when the file can mean one mechanic", () => {
   });
 
   it("ignores a file that is not a declared spec", () => {
-    const gaps = withSpec(
-      [mechanic({ id: "demo.area.mute", verify: undefined })],
-      ["src/mute.ts"]
-    );
+    const gaps = withSpec([mechanic({ id: "demo.area.mute", verify: undefined })], ["src/mute.ts"]);
     expect(find(gaps, "unlinked-spec")).toEqual([]);
   });
 
@@ -267,7 +264,9 @@ describe("the propose-only classes stay propose-only", () => {
   });
 
   it("never offers to promote a draft", () => {
-    const gaps = planGaps(input({ manifest: manifest({ mechanics: [mechanic({ status: "draft" })] }) }));
+    const gaps = planGaps(
+      input({ manifest: manifest({ mechanics: [mechanic({ status: "draft" })] }) })
+    );
     const [gap] = find(gaps, "draft-debt");
     expect(gap?.lane).toBe("propose");
     expect(gap?.op).toBeUndefined();

@@ -23,20 +23,14 @@
  * existing engines — nothing here re-implements an inventory.
  */
 
+import type { Inventory } from "./adapters";
 import { buildProvenance } from "./adapters";
 import { inventoryAppKinds } from "./coverage";
 import { discoverCorpus } from "./discover";
-import { listFilesRecursive, matchesAnyGlob } from "./fsutil";
-import { REPO_ROOT } from "./fsutil";
+import { listFilesRecursive, matchesAnyGlob, REPO_ROOT } from "./fsutil";
 import { appAdapters, appDir, appPath } from "./layout";
 import { buildManifest } from "./manifest";
-import type { Inventory } from "./adapters";
-import type {
-  AppMechanicsConfig,
-  ManifestMechanic,
-  MechanicsManifest,
-  WaveFile,
-} from "./types";
+import type { AppMechanicsConfig, ManifestMechanic, MechanicsManifest, WaveFile } from "./types";
 import { loadWaves } from "./waves";
 
 export type GapClass =
@@ -121,9 +115,7 @@ export function planGaps(input: GapInput): Gap[] {
   // Deterministic output: `--json` is diffed, and an unstable order turns
   // every re-scan into a change nobody made.
   const rank = { p0: 0, p1: 1, p2: 2 };
-  return gaps.sort(
-    (a, b) => rank[a.severity] - rank[b.severity] || a.key.localeCompare(b.key)
-  );
+  return gaps.sort((a, b) => rank[a.severity] - rank[b.severity] || a.key.localeCompare(b.key));
 }
 
 // ---------------------------------------------------------------------------
