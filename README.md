@@ -25,7 +25,9 @@ mechanics coverage --app=<slug>    # the table, the gaps, wave rollups
 mechanics gaps --app=<slug>        # what is missing, split into fix / ask
 mechanics report --html            # one self-contained page
 mechanics mcp                      # serve the corpus to an agent over stdio
+mechanics agents                   # which agent providers are reachable from here
 mechanics run list                 # the docket/1 board
+mechanics tui                      # leave it open: drift, gaps, runs, updates
 ```
 
 ## What it looks like
@@ -49,6 +51,48 @@ build step, no server, no external request. Attach it to a PR, or open it from
 
 Every one of those is generated from [`examples/perch`](./examples/perch) by
 `bun run docs:shots`, so they are the real CLI's real output on a real corpus.
+
+## Any agent, not just one
+
+The pipeline — scan, gaps, propose, fix — runs on whatever this machine
+actually has. `mechanics agents` probes and says which:
+
+```bash
+mechanics agents                                   # what is reachable
+mechanics gaps --app=<slug> --agent=claude         # a harness edits the tree itself
+mechanics gaps --app=<slug> --agent=ollama --model=qwen2.5-coder:7b
+mechanics gaps --app=<slug> --agent=?              # pick from what responded
+```
+
+Two provider shapes. A **harness** — `claude`, `codex`, `qwen` — is already an
+agent: hand it a brief in a worktree and it edits with its own tools. A
+**model** — `ollama`, `lmstudio`, any OpenAI-compatible endpoint — is text in,
+text out and cannot open a file, so it answers in a small edit protocol that
+mechanics validates, applies, and rolls back as one unit if the result does not
+build. The protocol is exact-substring rather than a diff on purpose: a patch
+needs the model to count context lines, and a hunk that lands at the wrong
+offset still parses.
+
+A provider may write mechanics, write specs, restructure app code — full reach
+over the tree. Four moves are refused whatever the provider: editing a wave
+file, promoting a draft to `active`, touching `coverage.ignore`, and flipping
+`coverage.enforce`. Those are not work, they are claims that the work is good.
+
+## Leaving it open
+
+```bash
+mechanics tui
+```
+
+A dashboard rather than a command: apps and their gaps, the issues worth acting
+on ordered by how quietly they fail, runs in flight, proposals waiting on you,
+and whether a newer release is out. It watches the corpus and `.docket/`, so it
+reacts to an edit rather than to a refresh.
+
+It never writes. The manifest is diffed with `check`, and the fix and scan keys
+print the command instead of running it — a keystroke that mutates the repo
+behind a full-screen redraw leaves you no diff and nowhere for the output to
+go.
 
 ## Onboarding more than one repo
 
@@ -104,6 +148,8 @@ corpus's life:
 | **Adapters** | `nextjs-app-router`, `convex`, `generic-glob` — plus the `SurfaceAdapter` seam, so a stack nobody wrote an adapter for declares its surfaces in config instead of forking |
 | **MCP** | five read tools over stdio: list, get, coverage, wave status, diff impact |
 | **Report** | `--html`: one file, no build step, no external request |
+| **TUI** | `mechanics tui` — the always-open view: drift, issues, runs, proposals, updates |
+| **Agents** | `claude`, `codex`, `qwen`, `ollama`, `lmstudio` — harnesses edit directly, models edit through a validated protocol |
 | **Gaps** | the five gap classes as predicates, each tagged `auto` (one correct answer) or `propose` (a judgment) — `gaps --fix` applies the first kind and refuses the rest in code |
 | **[docket/1](./spec/docket-1.md)** | the run protocol — work orders with checkable exit criteria and an append-only event log, with [executable conformance vectors](./spec/docket-1.vectors.json) |
 | **[Plugin](./plugin/)** | three Claude Code skills: init, verify, gaps |
