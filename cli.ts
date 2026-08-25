@@ -67,6 +67,8 @@ type Args = {
   propose: boolean;
   run?: string;
   scanRoots: string[];
+  agent?: string;
+  model?: string;
   adopt?: string;
   depth?: number;
   yes: boolean;
@@ -153,6 +155,9 @@ async function main() {
       break;
     case "scan":
       await runScan(args);
+      break;
+    case "agents":
+      await runAgents(args);
       break;
     case "impact":
       await runImpact(args);
@@ -570,6 +575,41 @@ async function runVerify(args: Args) {
 }
 
 // ---------------------------------------------------------------------------
+// agents
+// ---------------------------------------------------------------------------
+
+/**
+ * Which providers are actually reachable from this machine.
+ *
+ * Probing costs one spawn and one HTTP GET per provider and saves the worst
+ * failure mode there is: a pipeline that appears to hang because it was
+ * pointed at an endpoint nobody started.
+ */
+async function runAgents(_args: Args) {
+  const { probeAll, pickDefaultProvider } = await import("./agents");
+  const all = await probeAll();
+  const width = Math.max(...all.map((a) => a.name.length));
+  for (const a of all) {
+    const mark = a.available ? green("ready") : dim("unavailable");
+    console.log(
+      `  ${a.name.padEnd(width)}  ${dim(a.kind.padEnd(7))} ${mark.padEnd(20)} ${a.detail}`
+    );
+    if (a.models?.length) {
+      const shown = a.models.slice(0, 4).join(", ");
+      const more = a.models.length > 4 ? ` (+${a.models.length - 4})` : "";
+      console.log(`  ${" ".repeat(width)}  ${dim(`models: ${shown}${more}`)}`);
+    }
+  }
+  console.log("");
+  const def = await pickDefaultProvider();
+  console.log(
+    def
+      ? `  default: ${def.name} — harnesses are preferred, they can edit a tree unaided`
+      : `  ${yellow("no provider is reachable")} — install a harness, or start Ollama / LM Studio`
+  );
+}
+
+// ---------------------------------------------------------------------------
 // scan
 // ---------------------------------------------------------------------------
 
@@ -694,6 +734,52 @@ async function runGaps(args: Args) {
     for (const f of res.written)
       console.log(`  ${green(args.dryRun ? "would fix" : "fixed")} ${f}`);
     for (const d of plan.deferred) console.log(`  ${dim(`deferred ${d.gap.key}: ${d.reason}`)}`);
+  }
+
+  if (args.agent) {
+    const { resolveProvider, probeProvider } = await import("./agents");
+    const { agentFixGap } = await import("./autofix");
+    const spec = resolveProvider(args.agent, { model: args.model });
+    const probe = await probeProvider(spec);
+    if (!probe.available) {
+      console.error(`[mechanics] ${args.agent}: ${probe.detail}`);
+      process.exit(1);
+    }
+    const slug = slugs[0] as string;
+    // Verification after every gap, not once at the end: a batch that breaks
+    // on gap 3 and is only noticed at gap 12 has nine changes of unknown
+    // provenance mixed into the revert.
+    const verify = async () => {
+      const { buildManifest } = await import("./manifest");
+      const { errors } = await buildManifest(slug, REPO_ROOT);
+      return errors[0] ?? null;
+    };
+    console.log("");
+    for (const gap of propose) {
+      const res = await agentFixGap(gap, {
+        repoRoot: REPO_ROOT,
+        app: slug,
+        spec,
+        verify,
+        dryRun: args.dryRun,
+      });
+      const mark = {
+        changed: green("changed"),
+        declined: dim("declined"),
+        unusable: yellow("unusable"),
+        reverted: red("reverted"),
+      }[res.outcome];
+      console.log(`  ${mark} ${gap.title}`);
+      console.log(`        ${dim(res.summary)}`);
+      for (const f of res.written) console.log(`        ${green("+")} ${f}`);
+      for (const r of res.refused)
+        console.log(`        ${yellow("skipped")} ${r.path}: ${r.reason}`);
+      if (res.revertedBecause) console.log(`        ${red(res.revertedBecause)}`);
+    }
+    console.log("");
+    console.log(
+      `  ${dim("nothing was verified — a verdict is a human's, and so is accepting any of this")}`
+    );
   }
 
   if (args.propose) {
@@ -906,6 +992,8 @@ function parseArgs(argv: string[]): Args {
     else if (a.startsWith("--adopt=")) out.adopt = a.slice(8);
     else if (a.startsWith("--depth=")) out.depth = Number(a.slice(8));
     else if (a === "--yes") out.yes = true;
+    else if (a.startsWith("--agent=")) out.agent = a.slice(8);
+    else if (a.startsWith("--model=")) out.model = a.slice(8);
     else if (a === "--check") out.check = true;
     else if (a === "--resume") out.resume = true;
     else if (a === "--dry-run") out.dryRun = true;
@@ -956,6 +1044,8 @@ function usage() {
       "  bun mechanics gaps --app=<s> --propose --run=<id>  Queue the rest for a human",
       "  bun mechanics scan [--root=<dir>] [--depth=N] [--json]   Repos here, and their stacks",
       "  bun mechanics scan --adopt=<repo> [--app=<slug>] [--yes]  Onboard one of them",
+      "  bun mechanics agents                            Which agent providers are reachable",
+      "  bun mechanics gaps --app=<s> --agent=<name> [--model=<m>]  Let one close the rest",
       "  bun mechanics impact --app=<slug> --base=<ref>  Changed files → claiming mechanics",
       "  bun mechanics screens --app=<s> --wave=<w> --checkpoint=<before|after|...>",
       "                [--routes=/a,/b] [--base-url=u] [--viewport=WxH] [--suffix=mobile]",

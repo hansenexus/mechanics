@@ -230,7 +230,11 @@ async function cmdDispatch(flags: Flags): Promise<void> {
 
   // Resolved before planning: the worktree path is part of the plan, and a dry
   // run that prints a different command than it would execute is a small lie.
-  const deps = await buildDispatchDeps(flags.pr === true);
+  const deps = await buildDispatchDeps(
+    flags.pr === true,
+    flag(flags, "agent"),
+    flag(flags, "model")
+  );
   const primaryRoot = await findPrimaryRoot(deps.run, REPO_ROOT);
 
   const plan = planDispatch({
@@ -248,7 +252,9 @@ async function cmdDispatch(flags: Flags): Promise<void> {
     ...(issue !== undefined ? { issue } : {}),
     withPush: flags.push === true,
     withPr: flags.pr === true,
-    withAgent: flags.agent === true,
+    // `--agent` launches whatever harness is installed; `--agent=<name>`
+    // picks one. Both mean "launch an agent", so presence is what counts.
+    withAgent: flags.agent !== undefined,
   });
 
   console.log(describePlan(plan));
@@ -294,7 +300,7 @@ async function cmdDispatch(flags: Flags): Promise<void> {
   }
 }
 
-async function buildDispatchDeps(needsForge: boolean) {
+async function buildDispatchDeps(needsForge: boolean, agentName?: string, agentModel?: string) {
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
   const exec = promisify(execFile);
@@ -317,24 +323,43 @@ async function buildDispatchDeps(needsForge: boolean) {
     forge,
     actorIdentity: process.env.USER,
     launchAgent: async ({ worktree, prompt }: { worktree: string; prompt: string }) => {
-      const { spawn } = await import("node:child_process");
-      try {
-        await exec("which", ["claude"]);
-      } catch {
+      // Which harness runs the work is a machine fact, not a repo one. The
+      // default is whatever is actually installed rather than a hardcoded
+      // `claude`, so a box with a different CLI is not a box where dispatch
+      // silently does not work.
+      const { probeProvider, resolveProvider, runProvider } = await import("./agents");
+      const name = agentName ?? (await firstAvailableHarness());
+      if (!name) {
         throw new Error(
-          "docket: `claude` is not on PATH — drop --agent and start a session yourself"
+          "docket: no agent harness on PATH (tried claude, codex, qwen) — " +
+            "drop --agent and start a session yourself, or pass --agent=<name>"
         );
       }
-      // Detached: the agent outlives this command, which is the point of
-      // dispatching rather than running the work inline.
-      const child = spawn("claude", ["-p", prompt], {
-        cwd: worktree,
-        detached: true,
-        stdio: "ignore",
-      });
-      child.unref();
+      const spec = resolveProvider(name, { model: agentModel });
+      if (spec.kind !== "harness") {
+        throw new Error(
+          `docket: "${name}" is a model provider, not a harness — it cannot drive a worktree ` +
+            "on its own. Use `mechanics fix --agent=" +
+            name +
+            "` for the structured-edit loop instead."
+        );
+      }
+      const probe = await probeProvider(spec);
+      if (!probe.available) throw new Error(`docket: ${probe.detail}`);
+      await runProvider(spec, prompt, { cwd: worktree, detach: true });
+      return;
     },
   };
+}
+
+/** First harness actually installed, in declared order. */
+async function firstAvailableHarness(): Promise<string | null> {
+  const { BUILTIN_PROVIDERS, probeProvider } = await import("./agents");
+  for (const spec of Object.values(BUILTIN_PROVIDERS)) {
+    if (spec.kind !== "harness") continue;
+    if ((await probeProvider(spec)).available) return spec.name;
+  }
+  return null;
 }
 
 async function makeForge(run: (c: string, a: string[]) => Promise<string>, remoteName: string) {
