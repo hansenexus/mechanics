@@ -160,6 +160,24 @@ describe("runProvider", () => {
     ).rejects.toThrow(/exited 3.*boom/s);
   });
 
+  it("still reports the exit when the harness dies before reading its prompt", async () => {
+    // The test above raced this: a short prompt usually fits the pipe buffer,
+    // so the write lands even though nobody is reading, and the EPIPE only
+    // fires some of the time. A prompt larger than the buffer cannot be
+    // absorbed, so the write is guaranteed to fail against a process that has
+    // already gone — which used to surface as an unhandled exception that took
+    // the whole run down instead of this rejection.
+    const dir = await tmp();
+    await stubBinary(dir, "deaf", 'echo "nope" >&2; exit 4');
+    await expect(
+      runProvider(
+        { name: "fake", kind: "harness", command: path.join(dir, "deaf"), args: [] },
+        "x".repeat(1_000_000),
+        { cwd: dir }
+      )
+    ).rejects.toThrow(/exited 4.*nope/s);
+  });
+
   it("talks to an ollama endpoint", async () => {
     const base = await stubServer(() => ({ body: { response: "hi from ollama" } }));
     const reply = await runProvider(
