@@ -67,7 +67,13 @@
     "./docket-resolve": "./docket-resolve.ts",
     "./docket-events": "./docket-events.ts",
     "./docket-state": "./docket-state.ts",
-    "./spec/docket-1.vectors.json": "./spec/docket-1.vectors.json"
+    "./spec/docket-1.vectors.json": "./spec/docket-1.vectors.json",
+    "./gaps": "./gaps.ts",
+    "./fix": "./fix.ts",
+    "./proposals": "./proposals.ts",
+    "./scan": "./scan.ts",
+    "./scaffold": "./scaffold.ts",
+    "./init": "./init.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

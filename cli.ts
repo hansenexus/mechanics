@@ -66,6 +66,10 @@ type Args = {
   fix?: string[];
   propose: boolean;
   run?: string;
+  scanRoots: string[];
+  adopt?: string;
+  depth?: number;
+  yes: boolean;
   resume: boolean;
   dryRun: boolean;
   // screens
@@ -146,6 +150,9 @@ async function main() {
       break;
     case "gaps":
       await runGaps(args);
+      break;
+    case "scan":
+      await runScan(args);
       break;
     case "impact":
       await runImpact(args);
@@ -563,6 +570,81 @@ async function runVerify(args: Args) {
 }
 
 // ---------------------------------------------------------------------------
+// scan
+// ---------------------------------------------------------------------------
+
+async function runScan(args: Args) {
+  const { scan, resolveRoots, adopt } = await import("./scan");
+  const roots = resolveRoots(args.scanRoots, process.cwd());
+  const result = await scan({ roots, depth: args.depth });
+
+  if (args.adopt) {
+    // Adopt's refusals name a specific next step (the primary checkout to use,
+    // or the repos actually found). A stack trace would bury that under noise
+    // and read as a crash rather than an answer.
+    let init: Awaited<ReturnType<typeof adopt>>;
+    try {
+      init = await adopt(result, { target: args.adopt, app: args.app, yes: args.yes });
+    } catch (err) {
+      console.error(`[mechanics] ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+    for (const line of init.log) console.log(`  ${line}`);
+    if (!args.yes) {
+      console.log("");
+      console.log(`  nothing written. Repeat with --yes to commit to it:`);
+      console.log(
+        `    bun mechanics scan --adopt=${args.adopt}${args.app ? ` --app=${args.app}` : ""} --yes`
+      );
+    }
+    if (init.failed) process.exit(1);
+    return;
+  }
+
+  if (args.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  console.log(`  scanning ${result.roots.join(", ")}`);
+  console.log("");
+  const width = Math.max(4, ...result.repos.map((r) => r.name.length));
+  for (const r of result.repos) {
+    const stack = [
+      ...r.detection.adapters,
+      r.apps ? `${r.apps.dir}/ (${r.apps.slugs.length})` : null,
+      r.detection.packageManager,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    // A repo no built-in adapter matches is a real state with a real next
+    // step, not an empty cell — say so rather than leaving a blank that reads
+    // as "nothing to do here".
+    const mark = r.onboarded
+      ? green("onboarded")
+      : r.status === "needs-surfaces"
+        ? yellow("needs surfaces")
+        : dim("candidate");
+    const wt = r.worktrees.length ? dim(` +${r.worktrees.length} worktree(s)`) : "";
+    console.log(`  ${r.name.padEnd(width)}  ${mark.padEnd(24)} ${stack}${wt}`);
+  }
+  console.log("");
+  const adoptable = result.repos.filter((r) => !r.onboarded);
+  console.log(
+    `  ${result.repos.length} repo(s), ${adoptable.length} not onboarded` +
+      (result.orphanWorktrees.length
+        ? `, ${result.orphanWorktrees.length} worktree(s) whose primary is elsewhere`
+        : "")
+  );
+  if (result.truncated) {
+    console.log(`  ${yellow("(truncated)")} the walk hit its directory cap — narrow --root`);
+  }
+  if (adoptable.length > 0) {
+    console.log(`  onboard one with: bun mechanics scan --adopt=${adoptable[0]?.name}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // gaps
 // ---------------------------------------------------------------------------
 
@@ -801,6 +883,8 @@ function parseArgs(argv: string[]): Args {
     check: false,
     json: false,
     propose: false,
+    scanRoots: [],
+    yes: false,
     resume: false,
     dryRun: false,
     keepPng: false,
@@ -818,6 +902,10 @@ function parseArgs(argv: string[]): Args {
     else if (a === "--fix") out.fix = [];
     else if (a.startsWith("--fix=")) out.fix = a.slice(6).split(",").filter(Boolean);
     else if (a.startsWith("--run=")) out.run = a.slice(6);
+    else if (a.startsWith("--root=")) out.scanRoots.push(a.slice(7));
+    else if (a.startsWith("--adopt=")) out.adopt = a.slice(8);
+    else if (a.startsWith("--depth=")) out.depth = Number(a.slice(8));
+    else if (a === "--yes") out.yes = true;
     else if (a === "--check") out.check = true;
     else if (a === "--resume") out.resume = true;
     else if (a === "--dry-run") out.dryRun = true;
@@ -866,6 +954,8 @@ function usage() {
       "  bun mechanics gaps --app=<slug> | --all [--json] What the corpus is missing",
       "  bun mechanics gaps --app=<s> --fix[=ops]        Apply only the mechanical gaps",
       "  bun mechanics gaps --app=<s> --propose --run=<id>  Queue the rest for a human",
+      "  bun mechanics scan [--root=<dir>] [--depth=N] [--json]   Repos here, and their stacks",
+      "  bun mechanics scan --adopt=<repo> [--app=<slug>] [--yes]  Onboard one of them",
       "  bun mechanics impact --app=<slug> --base=<ref>  Changed files → claiming mechanics",
       "  bun mechanics screens --app=<s> --wave=<w> --checkpoint=<before|after|...>",
       "                [--routes=/a,/b] [--base-url=u] [--viewport=WxH] [--suffix=mobile]",
