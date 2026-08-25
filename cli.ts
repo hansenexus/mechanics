@@ -67,6 +67,7 @@ type Args = {
   propose: boolean;
   run?: string;
   scanRoots: string[];
+  interactive: boolean;
   agent?: string;
   model?: string;
   adopt?: string;
@@ -618,6 +619,45 @@ async function runScan(args: Args) {
   const roots = resolveRoots(args.scanRoots, process.cwd());
   const result = await scan({ roots, depth: args.depth });
 
+  // A picker, not a shortcut: `--adopt=<name>` still works and `--yes` is
+  // still required to write. This only saves you reading the table and
+  // retyping a name you can already see.
+  if (args.interactive && !args.adopt) {
+    const { isInteractive, intro, select, confirm, outro } = await import("./prompts");
+    if (!isInteractive()) {
+      console.error("[mechanics] scan --interactive needs a terminal. Use --adopt=<repo> --yes.");
+      process.exit(1);
+    }
+    const candidates = result.repos.filter((r) => !r.onboarded && r.primaryPresent);
+    if (candidates.length === 0) {
+      console.log("  every repo here is already onboarded");
+      return;
+    }
+    intro(`${result.repos.length} repo(s), ${candidates.length} not onboarded`);
+    args.adopt = await select(
+      "Which repo should mechanics adopt?",
+      candidates.map((r) => ({
+        value: r.name,
+        label: r.name,
+        hint:
+          (r.detection.adapters.join(", ") || "no built-in adapter — will need surfaces") +
+          (r.apps ? ` · ${r.apps.slugs.length} app(s)` : ""),
+      }))
+    );
+    const chosen = candidates.find((r) => r.name === args.adopt);
+    if (chosen?.apps && chosen.apps.slugs.length > 0 && !args.app) {
+      args.app = await select(
+        "Which app inside it?",
+        chosen.apps.slugs.map((slug) => ({ value: slug, label: slug }))
+      );
+    }
+    args.yes = await confirm(`Write the mechanics scaffolding into ${args.adopt}?`, false);
+    // Declining still falls through to the dry run below, which prints the
+    // plan and the `--yes` command. Saying "nothing written" here as well
+    // would announce the outcome before showing what was declined.
+    if (!args.yes) outro(`showing what ${args.adopt} would get — nothing will be written`);
+  }
+
   if (args.adopt) {
     // Adopt's refusals name a specific next step (the primary checkout to use,
     // or the repos actually found). A stack trace would bury that under noise
@@ -734,6 +774,33 @@ async function runGaps(args: Args) {
     for (const f of res.written)
       console.log(`  ${green(args.dryRun ? "would fix" : "fixed")} ${f}`);
     for (const d of plan.deferred) console.log(`  ${dim(`deferred ${d.gap.key}: ${d.reason}`)}`);
+  }
+
+  if (args.agent === "?") {
+    // `--agent=?` means "ask me". Spelled as a value rather than a separate
+    // flag so the interactive and scripted forms are the same argument.
+    const { isInteractive, select } = await import("./prompts");
+    const { probeAll } = await import("./agents");
+    if (!isInteractive()) {
+      console.error("[mechanics] --agent=? needs a terminal. Name one: --agent=claude");
+      process.exit(1);
+    }
+    const ready = (await probeAll()).filter((a) => a.available);
+    if (ready.length === 0) {
+      console.error("[mechanics] no agent provider is reachable — see `mechanics agents`");
+      process.exit(1);
+    }
+    args.agent = await select(
+      "Which agent should close the remaining gaps?",
+      ready.map((a) => ({
+        value: a.name,
+        label: a.name,
+        hint:
+          a.kind === "harness"
+            ? "edits the tree itself"
+            : `${a.models?.[0] ?? "model"} · structured edits`,
+      }))
+    );
   }
 
   if (args.agent) {
@@ -970,6 +1037,7 @@ function parseArgs(argv: string[]): Args {
     json: false,
     propose: false,
     scanRoots: [],
+    interactive: false,
     yes: false,
     resume: false,
     dryRun: false,
@@ -992,6 +1060,7 @@ function parseArgs(argv: string[]): Args {
     else if (a.startsWith("--adopt=")) out.adopt = a.slice(8);
     else if (a.startsWith("--depth=")) out.depth = Number(a.slice(8));
     else if (a === "--yes") out.yes = true;
+    else if (a === "--interactive" || a === "-i") out.interactive = true;
     else if (a.startsWith("--agent=")) out.agent = a.slice(8);
     else if (a.startsWith("--model=")) out.model = a.slice(8);
     else if (a === "--check") out.check = true;
@@ -1044,6 +1113,7 @@ function usage() {
       "  bun mechanics gaps --app=<s> --propose --run=<id>  Queue the rest for a human",
       "  bun mechanics scan [--root=<dir>] [--depth=N] [--json]   Repos here, and their stacks",
       "  bun mechanics scan --adopt=<repo> [--app=<slug>] [--yes]  Onboard one of them",
+      "  bun mechanics scan --interactive                Pick one from a list and adopt it",
       "  bun mechanics agents                            Which agent providers are reachable",
       "  bun mechanics gaps --app=<s> --agent=<name> [--model=<m>]  Let one close the rest",
       "  bun mechanics impact --app=<slug> --base=<ref>  Changed files → claiming mechanics",

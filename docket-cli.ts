@@ -121,6 +121,9 @@ export async function runDocketCli(argv: string[]): Promise<void> {
     case "attach":
       await cmdAttach(flags);
       break;
+    case "review":
+      await cmdReview(flags);
+      break;
     case "proposals":
       await cmdProposals(flags);
       break;
@@ -425,6 +428,95 @@ async function cmdProposals(flags: Flags): Promise<void> {
     console.log(`      ${r.title}`);
     console.log(`      ${r.suggestion}${r.op ? `  [applies: ${r.op.kind}]` : ""}`);
   }
+}
+
+/**
+ * Walk the open proposals one at a time and decide each.
+ *
+ * The reason this is a walkthrough and not a multi-select: accepting twelve
+ * proposals is twelve judgments, and an interface that makes it one keystroke
+ * is an interface that encourages waving them through. The cost of the
+ * interaction should match the cost of the decision.
+ */
+async function cmdReview(flags: Flags): Promise<void> {
+  const runId = flag(flags, "run") ?? fail("run review: --run is required");
+  const { isInteractive, intro, outro, note, reviewEach, text } = await import("./prompts");
+  if (!isInteractive()) {
+    fail(
+      "run review needs a terminal. Without one, use `run proposals` to read them and " +
+        "`run accept` / `run reject` to decide — every prompt has a flag."
+    );
+  }
+
+  const actor = currentActor(flags);
+  if (actor.kind !== "human") {
+    fail(
+      `run review: only a human may accept a proposal — you are "${actor.kind}". ` +
+        "Reviewing is deciding, and that is the one thing an agent may not do here."
+    );
+  }
+
+  const { listProposals, acceptProposal, rejectProposal } = await import("./proposals");
+  const statuses = await proposalStatuses(runId);
+  const open = (await listProposals(REPO_ROOT, runId)).filter(
+    (r) => (statuses.get(r.proposal) ?? "open") === "open"
+  );
+  if (open.length === 0) {
+    console.log(`[docket] ${runId}: nothing open to review`);
+    return;
+  }
+
+  intro(`${runId} — ${open.length} proposal(s) open`);
+  const decisions = await reviewEach(
+    open,
+    (r) => ({
+      title: r.title,
+      body: [
+        r.detail,
+        "",
+        `Suggested: ${r.suggestion}`,
+        r.op ? `Applies:   ${r.op.kind} → ${r.op.file}` : "Applies:   nothing mechanical",
+        `Raised by: ${r.raisedBy}`,
+      ].join("\n"),
+    }),
+    [
+      { value: "accept", label: "Accept", hint: "and apply the edit if it carries one" },
+      { value: "accept-only", label: "Accept without applying", hint: "record the decision" },
+      { value: "reject", label: "Reject", hint: "asks for a reason" },
+    ]
+  );
+
+  let accepted = 0;
+  let rejected = 0;
+  for (const { item, choice } of decisions) {
+    if (choice === "reject") {
+      // A reason is required by `rejectProposal` anyway; asking here means the
+      // requirement surfaces as a prompt rather than as an error afterwards.
+      const reason = await text(`Why reject "${item.proposal}"?`, {
+        placeholder: "not a real surface / handled elsewhere",
+        validate: (v) => (v.trim() ? undefined : "A reason is required — silence is not an answer"),
+      });
+      await rejectProposal(REPO_ROOT, runId, item.proposal, reason, actor);
+      rejected++;
+      continue;
+    }
+    const res = await acceptProposal(REPO_ROOT, runId, item.proposal, actor, {
+      apply: choice === "accept",
+    });
+    accepted++;
+    if (res.revertedBecause) {
+      note(res.revertedBecause, `reverted: ${item.proposal}`);
+    } else if (res.written.length) {
+      note(res.written.join("\n"), `wrote: ${item.proposal}`);
+    }
+  }
+
+  const left = open.length - accepted - rejected;
+  outro(
+    `${accepted} accepted, ${rejected} rejected` +
+      (left > 0 ? `, ${left} still open` : "") +
+      " — nothing here recorded a verification verdict"
+  );
 }
 
 async function cmdAccept(flags: Flags): Promise<void> {

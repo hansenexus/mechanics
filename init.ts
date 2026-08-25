@@ -332,7 +332,64 @@ a service.
 // Plan + execute
 // ---------------------------------------------------------------------------
 
-export async function runInit(argv: string[]): Promise<void> {
+/**
+ * Ask for what init would otherwise assume.
+ *
+ * Init's defaults are good — that is why it is idempotent and why agents can
+ * run it unconditionally. The wizard exists for the two answers it genuinely
+ * cannot infer: whether this is a monorepo, and what the app is called. Both
+ * are currently `--app` or nothing, and "nothing" silently means a single-app
+ * repo named `app`, which is right often enough to be a trap.
+ */
+async function interactiveInit(argv: string[]): Promise<string[]> {
+  const { intro, select, text, confirm, note, outro, isInteractive } = await import("./prompts");
+  if (!isInteractive()) return argv;
+
+  const root = findInitRoot(process.cwd());
+  const det = detect(root, root);
+  intro("mechanics init");
+  note(
+    [
+      `Repo:      ${root}`,
+      `Detected:  ${det.adapters.join(", ") || "no built-in adapter — you will declare surfaces by glob"}`,
+      `Packages:  ${det.packageManager}`,
+      det.playwrightConfig ? `Playwright: ${det.playwrightConfig}` : "Harness:   bun-script",
+    ].join("\n"),
+    "what this looks like from here"
+  );
+
+  const layout = await select("How is this repo laid out?", [
+    { value: "single", label: "Single app", hint: "the repo IS the app — mechanics/ at the root" },
+    { value: "mono", label: "Monorepo", hint: "apps/<slug>/mechanics/" },
+  ]);
+
+  const out = [...argv];
+  if (layout === "mono") {
+    const slug = await text("App slug", {
+      placeholder: "console",
+      validate: (v) =>
+        /^[a-z0-9]+(-[a-z0-9]+)*$/.test(v.trim()) ? undefined : "kebab-case, e.g. my-app",
+    });
+    out.push(`--app=${slug.trim()}`);
+  }
+
+  if (!(await confirm("Add the CI drift gate?", true))) out.push("--no-ci");
+  if (!(await confirm("Register the MCP server for agents?", true))) out.push("--no-mcp");
+  if (!(await confirm("Create .docket/ for agent work orders?", true))) out.push("--no-docket");
+
+  outro("writing — every file is skip-if-exists, so this is safe to re-run");
+  return out;
+}
+
+export async function runInit(rawArgv: string[]): Promise<void> {
+  // The wizard runs only for a bare `mechanics init` at a terminal. Any flag
+  // at all means the caller has already decided, and a script that passes
+  // `--dry-run` must not find itself being interviewed.
+  const argv =
+    rawArgv.length === 0 && !rawArgv.includes("--no-interactive")
+      ? await interactiveInit(rawArgv)
+      : rawArgv.filter((a) => a !== "--no-interactive");
+
   const opts: InitOptions = { ci: true, mcp: true, docket: true, dryRun: false };
   for (const a of argv) {
     if (a === "--no-ci") opts.ci = false;
