@@ -87,10 +87,15 @@ describe("examples/perch", () => {
       expect(out, `coverage should report '${kind}'`).toContain(kind);
     }
     expect(out).toContain("1 ignored");
+    // Each gap is NAMED, not just counted — a count tells you a gap exists,
+    // the name is the thing you act on.
+    for (const item of ["/login", "/api/webhooks/stripe", "monitors.exportCsv"]) {
+      expect(out, `coverage should name the gap '${item}'`).toContain(item);
+    }
   });
 
   it("has a wave in flight, with failures on the board", async () => {
     const { out } = await mechanics(["coverage", "--app=perch"]);
-    expect(out).toMatch(/wave 2026-08-redesign \[open\]: \d+\/\d+ verified, [1-9]\d* fail/);
+    expect(out).toMatch(/2026-08-redesign open [━─]+ \d+\/\d+ · [1-9]\d* fail/);
   });
 });

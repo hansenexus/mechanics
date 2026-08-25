@@ -31,7 +31,12 @@ import { mapImpact } from "./impact";
 import { appDir, appPath } from "./layout";
 import { buildManifest, emitManifest, loadManifest, onboardedApps } from "./manifest";
 import { validateScreens } from "./screens";
-import type { MechanicsManifest, VerificationMethod, VerificationStatus } from "./types";
+import type {
+  CoverageBucket,
+  MechanicsManifest,
+  VerificationMethod,
+  VerificationStatus,
+} from "./types";
 import {
   applySpecResults,
   createSpecExecutor,
@@ -69,6 +74,33 @@ type Args = {
   html: boolean;
   out?: string;
 };
+
+/**
+ * Colour, only when someone is there to see it.
+ *
+ * Off when stdout is not a TTY, so a redirect, a pipe, or a CI log gets clean
+ * text — every test capture depends on that. `FORCE_COLOR` turns it back on
+ * for callers that are piping deliberately and can render the escapes anyway;
+ * `bun run docs:shots` uses it so the screenshots show the real terminal
+ * colours instead of a second guess at them.
+ *
+ * `NO_COLOR` wins over `FORCE_COLOR`: the convention is that the user's opt
+ * out beats the program's opt in.
+ *
+ * Colour never carries meaning on its own here — every state that is coloured
+ * also says what it is in words.
+ */
+const COLOUR =
+  process.env.NO_COLOR === undefined &&
+  process.env.TERM !== "dumb" &&
+  (process.env.FORCE_COLOR !== undefined || Boolean(process.stdout.isTTY));
+
+const paint = (code: string) => (s: string) => (COLOUR && s ? `[${code}m${s}[0m` : s);
+const bold = paint("1");
+const dim = paint("2");
+const red = paint("31");
+const green = paint("32");
+const yellow = paint("33");
 
 /**
  * Spellings that mean "print usage and succeed", not "run a command".
@@ -277,38 +309,95 @@ async function printDrift(slug: string, fresh: MechanicsManifest) {
 // coverage
 // ---------------------------------------------------------------------------
 
+/**
+ * A surface is accounted for if it is claimed OR explicitly ignored. Filling
+ * the bar from `claimed` alone would paint an excused surface as a gap, which
+ * is the one thing the ignore list exists to say it is not.
+ */
+function coveredCount(b: { claimed: number; ignored: number }): number {
+  return b.claimed + b.ignored;
+}
+
+/**
+ * Heavy rule for the covered span, light rule for what is left. Two glyphs of
+ * the same width, so the bar reads as one line rather than as a block of
+ * shading, and a terminal without colour still shows the split.
+ */
+function bar(n: number, d: number, width = 16): string {
+  const filled = d === 0 ? width : Math.round((n / d) * width);
+  return "━".repeat(filled) + "─".repeat(width - filled);
+}
+
 async function runCoverage(args: Args) {
   const slugs = await resolveSlugs(args);
   for (const slug of slugs) {
     const { manifest, errors } = await buildManifest(slug);
-    console.log(`[mechanics] ${slug} — ${manifest.mechanicCount} mechanics`);
+
     // Surfaces come from the app's adapters, so a project with a `worker` or
     // `migration` kind gets a row here without this file knowing about it.
-    for (const surface of manifest.surfaces) {
-      const b = manifest.coverage[surface.kind];
-      if (!b) continue;
+    const buckets = manifest.surfaces
+      .map((s) => ({ surface: s, b: manifest.coverage[s.kind] }))
+      .filter((r): r is { surface: (typeof manifest.surfaces)[number]; b: CoverageBucket } =>
+        Boolean(r.b)
+      );
+    const totals = buckets.reduce(
+      (a, r) => ({ covered: a.covered + coveredCount(r.b), total: a.total + r.b.total }),
+      { covered: 0, total: 0 }
+    );
+
+    console.log(
+      `${bold(`mechanics · ${slug}`)} · ${manifest.mechanicCount} behaviours · ${totals.covered}/${totals.total} surfaces covered`
+    );
+    console.log("");
+
+    const width = Math.max(9, ...buckets.map((r) => r.surface.kind.length));
+    for (const { surface, b } of buckets) {
+      const n = coveredCount(b);
+      const pct = b.total === 0 ? 100 : Math.round((n / b.total) * 100);
+      const note = b.unclaimed.length
+        ? yellow(`${b.unclaimed.length} gap${b.unclaimed.length === 1 ? "" : "s"}`)
+        : b.ignored
+          ? dim(`${b.ignored} ignored`)
+          : "";
       console.log(
-        `  ${surface.kind.padEnd(17)} ${String(b.claimed).padStart(3)}/${String(b.total).padEnd(3)} claimed, ${b.ignored} ignored, ${b.unclaimed.length} unclaimed`
+        `  ${surface.kind.padEnd(width)} ${String(b.claimed).padStart(3)}/${String(b.total).padEnd(3)} ${paintBar(n, b.total)} ${String(pct).padStart(3)}%  ${note}`.trimEnd()
       );
     }
-    console.log(
-      `  tests             ${manifest.testCoverage.withTests} with tests, ${manifest.testCoverage.manualOnly} manual-only, ${manifest.testCoverage.untested} untested`
+
+    // Named, one per line. A count tells you a gap exists; the name is what
+    // you act on, and needing a second command to see it is why gaps get left.
+    const gaps = buckets.flatMap(({ surface, b }) =>
+      b.unclaimed.map((item) => ({ kind: surface.kind, item }))
     );
-    for (const surface of manifest.surfaces) {
-      for (const item of manifest.coverage[surface.kind]?.unclaimed ?? []) {
-        console.log(`    unclaimed ${surface.label}: ${item}`);
-      }
+    if (gaps.length > 0) {
+      console.log("");
+      for (const g of gaps) console.log(`  ${yellow("⚠")} ${g.kind.padEnd(width)} ${g.item}`);
     }
-    for (const e of errors) console.log(`    (error) ${e}`);
+
+    console.log("");
+    const t = manifest.testCoverage;
+    console.log(
+      `  ${"tests".padEnd(width)} ${t.withTests} linked · ${t.manualOnly} manual · ${t.untested > 0 ? yellow(`${t.untested} untested`) : "0 untested"}`
+    );
 
     const { waves } = await loadWaves(slug);
     for (const wave of waves) {
       const s = summarizeWave(wave, manifest.mechanics);
+      const verified = s.counts.pass + s.counts["n-a"];
       console.log(
-        `  wave ${s.slug} [${s.status}]: ${s.counts.pass + s.counts["n-a"]}/${s.scopeSize} verified, ${s.counts.fail} fail, ${s.counts.pending} pending`
+        `  ${"wave".padEnd(width)} ${s.slug} ${s.status} ${paintBar(verified, s.scopeSize)} ${verified}/${s.scopeSize} · ${s.counts.fail > 0 ? red(`${s.counts.fail} fail`) : "0 fail"} · ${s.counts.pending} pending`
       );
     }
+
+    for (const e of errors) console.log(`  ${red("(error)")} ${e}`);
   }
+}
+
+/** Green for the covered span, dim for the remainder. */
+function paintBar(n: number, d: number): string {
+  const b = bar(n, d);
+  const cut = b.lastIndexOf("━") + 1;
+  return green(b.slice(0, cut)) + dim(b.slice(cut));
 }
 
 // ---------------------------------------------------------------------------

@@ -80,6 +80,30 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .bar.gap i { background: var(--warn); }
 /* Nothing to cover is not full coverage — an empty track says so. */
 .bar.empty { opacity: 0.45; }
+/* The summary band: the page's answer, above the page's evidence. */
+.band {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+  padding: 16px 18px 12px; margin-top: 14px;
+}
+.lede { margin: 0 0 14px; font-size: 15px; line-height: 1.5; max-width: 62ch; }
+.lede strong { font-weight: 650; }
+.meter-row {
+  display: grid; grid-template-columns: minmax(120px, 220px) 1fr 62px;
+  gap: 12px; align-items: center; padding: 4px 0; font-size: 12.5px;
+}
+.meter-l { color: var(--muted); }
+.meter {
+  display: block; height: 7px; border-radius: 4px; background: var(--line);
+  overflow: hidden;
+}
+.meter i { display: block; height: 100%; background: var(--ok); }
+.meter i.gap { background: var(--warn); }
+.meter.empty { opacity: 0.45; }
+.meter-n { text-align: right; color: var(--muted); }
+@media (max-width: 560px) {
+  .meter-row { grid-template-columns: 1fr 56px; }
+  .meter-row .meter { grid-column: 1 / -1; order: 3; }
+}
 .hint { font-weight: 400; text-transform: none; letter-spacing: 0; }
 .pill {
   display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px;
@@ -276,14 +300,81 @@ function wavesSection(app: ReportApp): string {
   </table></div>`;
 }
 
+/**
+ * The page's answer, before the page's evidence.
+ *
+ * A reader arrives with one question — is this corpus keeping up with the app?
+ * — and the tables below answer it only after they have been read and summed.
+ * The lede states it in words and the meters show the three ratios it rests
+ * on, so scrolling is what you do to check the claim rather than to find it.
+ *
+ * COVERED counts claimed + ignored: an explicitly excused surface is accounted
+ * for, and counting it as a gap would make the ignore list meaningless.
+ */
+function summaryBand(app: ReportApp): string {
+  const m = app.manifest;
+  const t = m.testCoverage;
+
+  const buckets = m.surfaces.map((s) => m.coverage[s.kind]).filter((b) => b !== undefined);
+  const totals = buckets.reduce(
+    (a, b) => ({ covered: a.covered + b.claimed + b.ignored, total: a.total + b.total }),
+    { covered: 0, total: 0 }
+  );
+  const gaps = buckets.reduce((n, b) => n + b.unclaimed.length, 0);
+  const pct = (n: number, d: number) => (d === 0 ? 100 : Math.round((n / d) * 100));
+
+  const open = app.waves
+    .map((w) => summarizeWave(w, m.mechanics))
+    .filter((s) => s.status === "open");
+  const failing = open.reduce((n, s) => n + s.counts.fail, 0);
+  const verified = open.reduce((n, s) => n + s.counts.pass + s.counts["n-a"], 0);
+  const inScope = open.reduce((n, s) => n + s.scopeSize, 0);
+
+  // Each clause is dropped rather than rendered as a zero: "0 gaps remain" is
+  // noise, and an app with no open wave should not be told about waves at all.
+  // An app with no inventory gets a different sentence entirely — "100% of 0
+  // surfaces" is the same lie the empty-bar rule exists to prevent.
+  const clauses = [
+    totals.total === 0
+      ? `<strong>${m.mechanicCount} behaviour${m.mechanicCount === 1 ? "" : "s"}</strong>, and no surface inventory to check them against.`
+      : `<strong>${m.mechanicCount} behaviour${m.mechanicCount === 1 ? "" : "s"}</strong> account for <strong>${pct(totals.covered, totals.total)}%</strong> of ${totals.total} shipped surface${totals.total === 1 ? "" : "s"}.`,
+    gaps > 0
+      ? `<span class="untested">${gaps} gap${gaps === 1 ? "" : "s"}</span> remain.`
+      : `Every surface is claimed or explicitly ignored.`,
+    open.length > 0
+      ? `${open.length === 1 ? "One wave is" : `${open.length} waves are`} open at <strong>${verified}/${inScope}</strong>${failing > 0 ? `, with <span class="st-fail">${failing} failing</span>` : ""}.`
+      : "",
+  ].filter(Boolean);
+
+  const meters: Array<[string, number, number]> = [
+    ["Surfaces covered", totals.covered, totals.total],
+    ["Behaviours with a linked test", t.withTests, m.mechanicCount],
+  ];
+  if (open.length > 0) meters.push(["Wave verified", verified, inScope]);
+
+  return `<div class="band">
+    <p class="lede">${clauses.join(" ")}</p>
+    ${meters
+      .map(
+        ([label, n, d]) => `<div class="meter-row">
+      <span class="meter-l">${escapeHtml(label)}</span>
+      <span class="meter${d === 0 ? " empty" : ""}"><i class="${n >= d ? "" : "gap"}" style="width:${d === 0 ? 0 : pct(n, d)}%"></i></span>
+      <span class="meter-n mono">${n}/${d}</span>
+    </div>`
+      )
+      .join("")}
+  </div>`;
+}
+
 function appSection(app: ReportApp): string {
   const m = app.manifest;
   const t = m.testCoverage;
   return `<section>
     <h2>${escapeHtml(m.appSlug)}</h2>
-    <p class="sub">${m.mechanicCount} mechanics in ${m.areas.length} area${m.areas.length === 1 ? "" : "s"} ·
-      ${t.withTests} with tests, ${t.manualOnly} manual-only,
+    <p class="sub">${m.areas.length} area${m.areas.length === 1 ? "" : "s"} ·
+      ${t.manualOnly} manual-only,
       <span class="${t.untested > 0 ? "untested" : ""}">${t.untested} untested</span></p>
+    ${summaryBand(app)}
     <h3>Surface coverage</h3>
     ${surfacesTable(m)}
     ${wavesSection(app)}
