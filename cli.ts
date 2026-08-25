@@ -160,6 +160,18 @@ async function main() {
     case "agents":
       await runAgents(args);
       break;
+    case "tui": {
+      // Lazy: the dashboard pulls in watchers and every engine at once, and a
+      // one-shot `mechanics check` should not pay for that.
+      const { runTui } = await import("./tui-run");
+      const pkg = await import("./package.json", { with: { type: "json" } }).catch(() => null);
+      await runTui({
+        repoRoot: REPO_ROOT,
+        version: (pkg as { default?: { version?: string } } | null)?.default?.version ?? "0.0.0",
+        checkUpdates: !args.check,
+      });
+      break;
+    }
     case "impact":
       await runImpact(args);
       break;
@@ -1121,6 +1133,7 @@ function usage() {
       "                [--routes=/a,/b] [--base-url=u] [--viewport=WxH] [--suffix=mobile]",
       "                [--keep-png] [--dry-run]         Capture per-route screenshots",
       "  bun mechanics mcp                               Serve the corpus to an agent (stdio)",
+      "  bun mechanics tui                               Leave it open: drift, gaps, runs, updates",
       "",
       "  bun mechanics run list [--watch]                Board: runs in flight (docket/1)",
       '  bun mechanics run new --title="…"               Open a work order',

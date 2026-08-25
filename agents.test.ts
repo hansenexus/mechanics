@@ -192,7 +192,7 @@ describe("parseEditPlan", () => {
   });
 
   it("digs the object out of a code fence", () => {
-    expect(parseEditPlan("```json\n" + PLAN + "\n```")?.summary).toBe("s");
+    expect(parseEditPlan(`\`\`\`json\n${PLAN}\n\`\`\``)?.summary).toBe("s");
   });
 
   it("digs it out of surrounding prose", () => {
