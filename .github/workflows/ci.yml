@@ -1,0 +1,97 @@
+name: ci
+
+# Three gates, smallest first, so a formatting slip fails in seconds rather
+# than after a full pack-and-install cycle:
+#
+#   check    — biome, tsc, vitest against the source tree.
+#   tarball  — the release checklist's §3 smoke: pack, install the artifact
+#              into a scratch consumer, and drive the template through the
+#              INSTALLED cli. `template.test.ts` cannot cover this, because it
+#              runs the CLI from the checkout rather than from a tarball.
+#   dist     — the bundled entry actually starts under plain node. The bin is
+#              built by `prepublishOnly`, so nothing else would notice it
+#              breaking until a publish had already gone out.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun run test
+
+  tarball:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: bun install --frozen-lockfile
+
+      - name: Pack
+        run: |
+          set -euo pipefail
+          bun run build
+          npm pack --pack-destination /tmp
+          ls -l /tmp/*.tgz
+
+      - name: Template smoke against the installed artifact
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/consumer && cd /tmp/consumer
+          npm init -y >/dev/null
+          npm i /tmp/hansenexus-mechanics-*.tgz >/dev/null
+          cp -R node_modules/@hansenexus/mechanics/template/. .
+          npx mechanics check --app=example
+          npx mechanics build --all --check
+          npx mechanics report --html --out=/tmp/report.html
+          test -s /tmp/report.html
+
+  dist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: bun install --frozen-lockfile
+
+      - name: Bundled CLI runs under node
+        run: |
+          set -euo pipefail
+          bun run build
+          node dist/cli.js --help

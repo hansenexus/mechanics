@@ -70,6 +70,13 @@ type Args = {
   out?: string;
 };
 
+/**
+ * Spellings that mean "print usage and succeed", not "run a command".
+ * Declared above the top-level `await main()` on purpose: a `const` below it
+ * would still be in its temporal dead zone when the dispatch reads it.
+ */
+const HELP_FLAGS = new Set(["--help", "-h", "help"]);
+
 await main();
 
 async function main() {
@@ -122,8 +129,11 @@ async function main() {
       break;
     }
     default:
+      // An asked-for usage screen is a success; an unrecognised command is
+      // not. Both print the same text, so only the exit code separates
+      // `mechanics --help` in a script from a typo'd subcommand.
       usage();
-      process.exit(args.command ? 1 : 0);
+      process.exit(args.command && !HELP_FLAGS.has(args.command) ? 1 : 0);
   }
 }
 
@@ -738,6 +748,7 @@ function usage() {
       "  bun mechanics screens --app=<s> --wave=<w> --checkpoint=<before|after|...>",
       "                [--routes=/a,/b] [--base-url=u] [--viewport=WxH] [--suffix=mobile]",
       "                [--keep-png] [--dry-run]         Capture per-route screenshots",
+      "  bun mechanics mcp                               Serve the corpus to an agent (stdio)",
       "",
       "  bun mechanics run list [--watch]                Board: runs in flight (docket/1)",
       '  bun mechanics run new --title="…"               Open a work order',

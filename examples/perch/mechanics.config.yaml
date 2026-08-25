@@ -1,0 +1,25 @@
+# Perch — a worked example with a real coverage gap in it.
+#
+# `template/` is the starter you get from `mechanics init`: small, green, and
+# fully claimed. This is the opposite end — a corpus part-way through its life,
+# with unclaimed surfaces, a wave in flight, and failures on the board. It
+# exists so the coverage output in the README is a picture of the tool doing
+# its job rather than a picture of an empty repo.
+#
+# A single-app repo: `dir: .` drops the `apps/<slug>/` prefix from every
+# derived path.
+apps:
+  - slug: perch
+    dir: .
+
+    # Both built-in adapters, plus one glob-declared kind. Mixing them is the
+    # normal case: the adapters know Next.js and Convex, and nothing but the
+    # config knows that `src/workers/` is a surface at all.
+    adapters: ["nextjs-app-router", "convex"]
+
+    surfaces:
+      - kind: worker
+        label: background worker
+        globs: ["src/workers/*.ts"]
+
+manifestsDir: .mechanics/manifests
