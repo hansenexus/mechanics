@@ -419,12 +419,19 @@ async function runHarness(
       }
       resolve({ provider: spec.name, kind: "harness", text: out, detached: false });
     });
-    if (usesStdin) {
-      child.stdin.write(prompt);
-      child.stdin.end();
-    } else {
-      child.stdin.end();
-    }
+    // A harness that exits without reading its prompt — a rejected flag, a
+    // wrapper that dies on startup — closes the pipe before this write lands,
+    // and Node reports that as an EPIPE on `stdin` with no listener, which is
+    // an unhandled exception that takes the whole process down. It took the
+    // test runner down too, mid-suite, while it was about to report the REAL
+    // failure: the non-zero exit and the stderr saying why.
+    //
+    // Swallowing it loses nothing. A failed write to a process that is gone is
+    // never the interesting fact, and `close` and `error` already hold the
+    // exit code and the message that explain what actually happened.
+    child.stdin.on("error", () => {});
+    if (usesStdin) child.stdin.write(prompt);
+    child.stdin.end();
   });
 }
 
