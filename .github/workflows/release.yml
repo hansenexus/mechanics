@@ -1,15 +1,32 @@
 name: release
 
-# Publishes to npm from CI, with provenance.
+# Publishes to npm from CI, with provenance, over Trusted Publishing.
 #
 # Provenance is the point. Published from a laptop, `repository` in
 # package.json is an unverifiable claim: anyone can point a package at any
-# repo. Published from here with `--provenance`, npm records a signed
-# attestation tying the tarball to this workflow, this repo and the exact
-# commit — which is what makes the npm page's "Repository" link mean something.
+# repo. Published from here, npm records a signed attestation tying the
+# tarball to this workflow, this repo and the exact commit — which is what
+# makes the npm page's "Repository" link mean something.
 #
-# It requires `id-token: write`, a public repo, and npm >= 9.5. The `repository`
-# URL in package.json must match this repo or npm rejects the attestation.
+# There is no NPM_TOKEN. npm trusts this workflow by OIDC: the runner presents
+# a short-lived identity token, and npm checks it against the trusted publisher
+# configured on the package. Nothing to rotate, nothing to leak, and no
+# token needing the 2FA-bypass flag that a CI-usable classic token requires.
+#
+# Configured at npmjs.com → the package → Settings → Trusted Publisher:
+#
+#     Organization or user   hansenexus
+#     Repository             mechanics
+#     Workflow filename      release.yml
+#     Environment            (blank)
+#
+# Renaming this file, or moving the job to another workflow, breaks publishing
+# until that field is updated to match.
+#
+# Requires `id-token: write`, a public repo, and npm >= 11.5.1 — newer than the
+# npm bundled with any current setup-node, hence the upgrade step below. The
+# `repository` URL in package.json must match this repo or npm rejects the
+# attestation.
 #
 # Trigger: push a `v<version>` tag. The tag is the release; the workflow
 # refuses to publish if it disagrees with package.json, because a mismatch
@@ -48,6 +65,10 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      # Trusted publishing needs a newer npm than any setup-node ships with.
+      - name: npm supporting OIDC
+        run: npm install -g npm@latest
+
       - run: bun install --frozen-lockfile
 
       - name: Tag and package.json agree
@@ -76,15 +97,11 @@ jobs:
 
       - name: Publish
         if: ${{ github.event_name == 'push' || !inputs.dry_run }}
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
 
       - name: Publish (dry run)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
-        run: npm publish --provenance --access public --dry-run
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --dry-run
 
       - name: GitHub release
         if: startsWith(github.ref, 'refs/tags/v')

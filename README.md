@@ -105,10 +105,12 @@ The `mechanics` bin is a bundled Node build (`dist/cli.js`), so both
 The package also ships its TypeScript source, importable directly under Bun
 (≥ 1.2), which is what development and the test suite run on.
 
-Releases are published from [CI](./.github/workflows/release.yml) with npm
-provenance, so the tarball on npm carries a signed attestation tying it to this
-repository and the commit it was built from. `repository` in a package.json is
-a claim anyone can make; the attestation is the part that can be checked.
+Releases are published from [CI](./.github/workflows/release.yml) over npm
+Trusted Publishing, so the tarball on npm carries a signed attestation tying it
+to this repository and the commit it was built from. `repository` in a
+package.json is a claim anyone can make; the attestation is the part that can
+be checked. There is no publish token to leak or rotate — npm verifies the
+workflow's OIDC identity directly.
 
 ## Licence
 
