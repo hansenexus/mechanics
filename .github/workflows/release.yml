@@ -99,9 +99,27 @@ jobs:
         if: ${{ github.event_name == 'push' || !inputs.dry_run }}
         run: npm publish --access public
 
+      # A dry run against an unbumped version always collides, because the
+      # registry is reached and answers honestly. That answer is the useful
+      # signal: it is proof the OIDC exchange authenticated, which is the one
+      # thing about trusted publishing that cannot be checked any other way.
+      # Treated as success HERE ONLY — the real publish above still fails on a
+      # collision, which is what should happen.
       - name: Publish (dry run)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
-        run: npm publish --access public --dry-run
+        run: |
+          set -o pipefail
+          if npm publish --access public --dry-run 2>&1 | tee /tmp/publish.log; then
+            echo "dry run clean — this version is publishable"
+            exit 0
+          fi
+          if grep -q "cannot publish over the previously published versions" /tmp/publish.log; then
+            echo "::notice::Authenticated to npm and the tarball is well-formed."
+            echo "::notice::Version $(node -p "require('./package.json').version") is already published — bump before releasing."
+            exit 0
+          fi
+          echo "::error::dry run failed for a reason other than a version collision"
+          exit 1
 
       - name: GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
