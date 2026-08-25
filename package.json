@@ -10,13 +10,17 @@
     "documentation",
     "mcp",
     "docket",
-    "agents"
+    "agents",
+    "behaviour-driven",
+    "acceptance-testing",
+    "claude-code",
+    "cli"
   ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/hansenexus/mechanics.git"
   },
-  "homepage": "https://github.com/hansenexus/mechanics#readme",
+  "homepage": "https://mechanics.hansenexus.dev",
   "bugs": "https://github.com/hansenexus/mechanics/issues",
   "engines": {
     "bun": ">=1.2"

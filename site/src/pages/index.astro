@@ -1,0 +1,798 @@
+---
+import CopyCommand from "../components/CopyCommand.astro";
+import TerminalCard from "../components/TerminalCard.astro";
+import Landing from "../layouts/Landing.astro";
+
+const REPO = "https://github.com/hansenexus/mechanics";
+const NPM = "https://www.npmjs.com/package/@hansenexus/mechanics";
+---
+
+<Landing
+  title="mechanics — did we keep every behaviour?"
+  description="Behaviour specs with a coverage ratchet. Every surface the app ships is claimed by a documented behaviour, or it is a named gap the build fails on."
+>
+  <header class="nav">
+    <a class="wordmark" href="/">mechanics</a>
+    <nav>
+      <a href="/getting-started/">Docs</a>
+      <a href={REPO}>GitHub</a>
+      <a href={NPM}>npm</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- 1. Hero -->
+    <section class="hero">
+      <h1>did we keep every behaviour?</h1>
+      <p class="lede">
+        Your agent writes the code fast. <strong>mechanics</strong> is the ledger of what the
+        app is supposed to do — and the gate that fails CI when the two drift apart.
+      </p>
+
+      <CopyCommand command="npm i -D @hansenexus/mechanics" />
+
+      <p class="hero-links">
+        <a href="/getting-started/">Get started</a>
+        <span class="sep">·</span>
+        <a href={REPO}>Source</a>
+        <span class="sep">·</span>
+        <a href="/report/">See a real report</a>
+      </p>
+
+      <p class="badges">
+        <a href={NPM}
+          ><img
+            src="https://img.shields.io/npm/v/@hansenexus/mechanics?logo=npm&color=cb3837"
+            alt="npm version"
+            width="104"
+            height="20"
+          /></a
+        >
+        <a href={`${REPO}/actions/workflows/ci.yml`}
+          ><img
+            src={`${REPO}/actions/workflows/ci.yml/badge.svg`}
+            alt="CI status"
+            width="60"
+            height="20"
+          /></a
+        >
+        <a href={`${REPO}/blob/main/LICENSE`}
+          ><img
+            src="https://img.shields.io/npm/l/@hansenexus/mechanics?color=blue"
+            alt="MIT licence"
+            width="80"
+            height="20"
+          /></a
+        >
+      </p>
+    </section>
+
+    <!-- 2. The problem -->
+    <section class="band">
+      <h2>An agent can delete a feature and leave the suite green</h2>
+      <p>
+        It removes the code and the test that covered it in the same commit. Every remaining
+        test passes, because the test that would have failed went with the feature. Line
+        coverage does not drop — the lines are gone. Nothing anywhere notices.
+      </p>
+      <p>
+        vitest answers <em>do my tests pass?</em> Nothing in the toolchain answers{" "}
+        <em>does this app still do everything it used to do?</em> That question needs a record
+        of the behaviours that is kept outside the code, and a check that the two still agree.
+      </p>
+    </section>
+
+    <!-- 3. The differentiator -->
+    <section>
+      <h2>Coverage for what your app does, not what your code runs</h2>
+      <p class="measure">
+        Line coverage reports which lines executed. mechanics reports which{" "}
+        <strong>shipped surfaces</strong> — routes, API routes, Convex functions, crons, HTTP
+        endpoints, background workers, whatever your adapters declare — no documented
+        behaviour claims. Every one that is left over is a gap with a name and a path, not a
+        percentage.
+      </p>
+
+      <TerminalCard caption="Coverage: what the app ships, against what the corpus claims" command="mechanics coverage --app=perch">
+        <span class="b">mechanics</span> · <span class="b">perch</span> · 25 behaviours · 38/42 surfaces covered
+{"\n\n"}  route            10/12  <span class="ok">—————————</span><span class="dim">—</span>  <span class="dim">83%</span>  <span class="warn">2 gaps</span>
+{"\n"}  api-route         4/5   <span class="ok">————————</span><span class="dim">——</span>  <span class="dim">80%</span>  <span class="warn">1 gap</span>
+{"\n"}  convex-function  16/17  <span class="ok">—————————</span><span class="dim">—</span>  <span class="dim">94%</span>  <span class="warn">1 gap</span>
+{"\n"}  cron              3/3   <span class="ok">——————————</span> <span class="dim">100%</span>
+{"\n"}  http-endpoint     2/2   <span class="ok">——————————</span> <span class="dim">100%</span>
+{"\n"}  worker            2/3   <span class="ok">——————————</span> <span class="dim">100%</span>  <span class="dim">1 ignored</span>
+{"\n\n"}  <span class="warn">⚠ route</span>           /
+{"\n"}  <span class="warn">⚠ route</span>           /login
+{"\n"}  <span class="warn">⚠ api-route</span>       /api/webhooks/stripe
+{"\n"}  <span class="warn">⚠ convex-function</span> monitors.exportCsv
+{"\n\n"}  tests            16 linked · 1 manual · <span class="warn">8 untested</span>
+{"\n"}  wave             2026-08-redesign open <span class="ok">—————</span><span class="dim">—————</span> 10/17 · <span class="bad">3 fail</span> · 3 pending
+      </TerminalCard>
+
+      <p class="caption">
+        Real output from <a href={`${REPO}/tree/main/examples/perch`}><code>examples/perch</code></a>,
+        a corpus part-way through its life. Four surfaces are unclaimed on purpose — a coverage
+        table with no gaps is a bad advertisement for a tool that finds gaps.
+      </p>
+
+      <div class="not">
+        <h3>What it is not</h3>
+        <p>
+          mechanics does not run your tests, replace vitest or playwright, or measure line
+          coverage. It sits above them and audits whether what you ship, what you document,
+          and what you test still line up. It has no opinion about how you write the tests
+          themselves.
+        </p>
+      </div>
+    </section>
+
+    <!-- 4. How it works -->
+    <section>
+      <h2>How it works</h2>
+      <ol class="steps">
+        <li>
+          <strong>Write a behaviour as one markdown file</strong> — frontmatter for the
+          surfaces it claims, labelled acceptance criteria for what it promises.
+        </li>
+        <li>
+          <strong><code>mechanics build</code> compiles a manifest</strong> and you commit it.
+          CI diffs the committed manifest against the corpus, so an edited behaviour with a
+          stale manifest fails the build.
+        </li>
+        <li>
+          <strong>Adapters inventory what the app actually ships</strong> — the Next.js route
+          tree, the Convex function list, or any set of files you declare by glob.
+        </li>
+        <li>
+          <strong>Anything unclaimed is a named gap.</strong> Set{" "}
+          <code>coverage.enforce: error</code> when the corpus is complete and it stays that
+          way — that is the ratchet.
+        </li>
+      </ol>
+
+      <div class="pair">
+        <figure>
+          <figcaption>a behaviour</figcaption>
+          <pre><code>{`---
+title: Create a monitor for an endpoint
+kind: user-facing
+status: active
+priority: p0
+claims:
+  route: ["/dashboard/monitors/new"]
+  api-route: ["/api/monitors"]
+  convex-function: ["monitors.create"]
+verify: e2e
+---
+
+## Acceptance Criteria
+
+- **AC1** Given a valid HTTPS URL and an
+  interval, When I submit the form, Then
+  the monitor appears with status \`pending\`
+  and its first check is scheduled within
+  one interval.
+- **AC2** Given a URL already monitored in
+  this workspace, When I submit, Then the
+  form rejects it and links to the existing
+  monitor.`}</code></pre>
+        </figure>
+        <figure>
+          <figcaption>its row in the report</figcaption>
+          <div class="scroll">
+            <table>
+            <thead>
+              <tr><th>ID</th><th>Behaviour</th><th class="num">ACs</th><th class="num">Tests</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>perch.monitors.create-monitor</code></td>
+                <td>Create a monitor for an endpoint <span class="pill p0">p0</span></td>
+                <td class="num">4</td>
+                <td class="num">1</td>
+              </tr>
+              <tr>
+                <td><code>perch.monitors.record-check-result</code></td>
+                <td>Record the outcome of a probe <span class="pill p0">p0</span></td>
+                <td class="num">4</td>
+                <td class="num untested">none</td>
+              </tr>
+              <tr>
+                <td><code>perch.incidents.resolve-incident</code></td>
+                <td>Resolve an incident by hand</td>
+                <td class="num">3</td>
+                <td class="num"><span class="pill">manual</span></td>
+              </tr>
+            </tbody>
+            </table>
+          </div>
+          <p class="caption">
+            The claim is the link. A behaviour that claims a route and a Convex function
+            covers both; a route nothing claims shows up in the table above as a gap.
+          </p>
+        </figure>
+      </div>
+    </section>
+
+    <!-- 5. The drift gate -->
+    <section>
+      <h2>The gate is what stops the corpus rotting</h2>
+      <p class="measure">
+        Documentation decays because nothing checks it. The manifest is committed, so CI can
+        diff it — edit a behaviour and forget to rebuild, and the build says so by name.
+        Validation names every unclaimed surface rather than totalling them, because a total
+        is not actionable and a path is.
+      </p>
+
+      <TerminalCard caption="The drift gate: an edited mechanic with a stale manifest" command="mechanics build --all --check">
+{"\n"}<span class="dim">[mechanics]</span> <span class="bad">✗ perch: manifest drift</span>
+{"\n"}  <span class="warn">~ changed perch.monitors.create-monitor</span>
+{"\n\n"}<span class="dim">[mechanics]</span> <span class="bad">✗ committed manifest(s) are stale.</span> Run `mechanics build --all` and commit the result.
+      </TerminalCard>
+
+      <TerminalCard caption="Validation: the corpus parses, and every gap is named" command="mechanics check --app=perch">
+<span class="dim">[mechanics]</span> <span class="warn">warn</span>  perch: unclaimed route "/" — claim it in a mechanic or ignore it
+{"\n"}<span class="dim">[mechanics]</span> <span class="warn">warn</span>  perch: unclaimed route "/login" — claim it in a mechanic or ignore it
+{"\n"}<span class="dim">[mechanics]</span> <span class="warn">warn</span>  perch: unclaimed API route "/api/webhooks/stripe" — claim it in a mechanic or ignore it
+{"\n"}<span class="dim">[mechanics]</span> <span class="warn">warn</span>  perch: unclaimed Convex function "monitors.exportCsv" — claim it in a mechanic or ignore it
+{"\n"}<span class="dim">[mechanics]</span> <span class="ok">✓ perch: 25 mechanics ok</span> <span class="dim">(4 warning(s))</span>
+      </TerminalCard>
+    </section>
+
+    <!-- 6. The refusals -->
+    <section>
+      <h2>The two things it refuses to do</h2>
+      <div class="refusals">
+        <div class="refusal">
+          <h3>Record a verdict without evidence</h3>
+          <p>
+            <code>pass</code> requires an evidence string, at write time and again at read
+            time. A hand-edited log cannot slip one through.
+          </p>
+        </div>
+        <div class="refusal">
+          <h3>Let a model mark its own work green</h3>
+          <p>
+            The MCP server is read-only, and a test asserts no write-shaped tool name is
+            advertised. An agent may fix what has one correct answer, and may raise or reject
+            a proposal, but <code>mechanics run accept</code> refuses any actor that is not
+            human — accepting asserts a suggestion was right, which is the same act as marking
+            work green.
+          </p>
+        </div>
+      </div>
+      <p class="honest">
+        <em>Stated plainly, because the alternative is overclaiming:</em> the actor check infers{" "}
+        <code>human</code> from the absence of an agent session variable, so a process that
+        unsets it is indistinguishable from a person. It removes the default path and nothing
+        more. The durable boundary is that proposals and their resolutions are committed files
+        somebody reviews.
+      </p>
+    </section>
+
+    <!-- 7. Any agent -->
+    <section>
+      <h2>Any agent, not just one</h2>
+      <p class="measure">
+        The pipeline — scan, gaps, propose, fix — runs on whatever the machine actually has.
+        A repo on a locked-down network, a team standardised on a different CLI, and a laptop
+        with a local model and no API budget all want the same loop.
+      </p>
+
+      <div class="pair">
+        <div>
+          <h3>Harness providers</h3>
+          <p>
+            <code>claude</code>, <code>codex</code>, <code>qwen</code> — already agents. Hand
+            one a brief in a worktree and it edits with its own tools.
+          </p>
+        </div>
+        <div>
+          <h3>Model providers</h3>
+          <p>
+            <code>ollama</code>, <code>lmstudio</code>, any OpenAI-compatible endpoint — text
+            in, text out. They answer in a small edit protocol that mechanics validates,
+            applies, and rolls back as one unit if the result does not build.
+          </p>
+        </div>
+      </div>
+
+      <p class="measure">
+        Four moves are refused whatever the provider: editing a wave file, promoting a draft
+        to <code>active</code>, touching <code>coverage.ignore</code>, and flipping{" "}
+        <code>coverage.enforce</code>. Those are not work — they are claims that the work is
+        good.
+      </p>
+
+      <TerminalCard caption="Pick a provider, or ask which ones responded" command="mechanics agents">
+        <span class="ok">✓</span> claude       harness    <span class="dim">claude-cli 2.1.0</span>
+{"\n"}<span class="ok">✓</span> ollama       model      <span class="dim">3 models · qwen2.5-coder:7b, …</span>
+{"\n"}<span class="dim">·</span> codex        harness    <span class="dim">not on PATH</span>
+{"\n"}<span class="dim">·</span> lmstudio     model      <span class="dim">no endpoint at :1234</span>
+      </TerminalCard>
+    </section>
+
+    <!-- 8. The report -->
+    <section>
+      <h2>One self-contained page, and a full-screen view</h2>
+      <p class="measure">
+        <code>mechanics report --html</code> is the same data as a single file — no build
+        step, no server, no external request. Attach it to a PR, or open it from{" "}
+        <code>file://</code> six months later and it still renders.
+      </p>
+      <p>
+        <a class="cta" href="/report/">Open the perch report →</a>
+      </p>
+      <figure class="shot">
+        <img
+          src="/images/report.png"
+          alt="The HTML coverage report: surface coverage bars, a wave rollup with failures, and all 25 behaviours"
+          width="1180"
+          height="2051"
+          loading="lazy"
+          decoding="async"
+        />
+      </figure>
+      <p class="measure">
+        <code>mechanics tui</code> is the same corpus as a dashboard you leave open: apps and
+        their gaps, issues ordered by how quietly they fail, runs in flight, proposals waiting
+        on you. It watches the corpus and <code>.docket/</code>, so it reacts to an edit
+        rather than to a refresh — and it never writes.
+      </p>
+    </section>
+
+    <!-- 9. Provenance -->
+    <section class="band">
+      <h2>The tarball can be checked, not just trusted</h2>
+      <p class="measure">
+        Releases publish from CI over npm Trusted Publishing, so the package carries a signed
+        attestation tying it to this repository and the commit it was built from.
+        <code>repository</code> in a package.json is a claim anyone can make; the attestation
+        is the part that can be verified. There is no publish token to leak or rotate — npm
+        verifies the workflow's OIDC identity directly.
+      </p>
+    </section>
+
+    <!-- 10. Start -->
+    <section class="start">
+      <h2>Start here</h2>
+      <TerminalCard caption="Onboard a repo">
+<span class="dim"># single-app repo</span>
+{"\n"}<span class="prompt">$</span> <span class="cmd">npm i -D @hansenexus/mechanics && npx mechanics init</span>
+{"\n\n"}<span class="dim"># monorepo: apps/&lt;slug&gt;</span>
+{"\n"}<span class="prompt">$</span> <span class="cmd">npx mechanics init --app=&lt;slug&gt;</span>
+{"\n\n"}<span class="dim"># or from inside Claude Code</span>
+{"\n"}<span class="prompt">$</span> <span class="cmd">/plugin marketplace add hansenexus/mechanics</span>
+      </TerminalCard>
+      <p class="measure">
+        Init is idempotent — every file is skip-if-exists — and writes the repo config, a
+        corpus skeleton, the CI gate matched to your package manager and detected adapters,
+        the <code>.mcp.json</code> registration, and the committed manifest.
+        <code>--dry-run</code> shows the plan and writes nothing.
+      </p>
+      <p class="hero-links">
+        <a href="/getting-started/">Read the docs</a>
+        <span class="sep">·</span>
+        <a href={REPO}>Star it on GitHub</a>
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      MIT. The <a href="/docket/">docket/1 specification</a> is additionally available under
+      CC BY 4.0, so another implementation may reuse its wording with attribution.
+    </p>
+    <p>
+      Built by <a href="https://hansenexus.dev">hansenexus</a> — we build and run software for
+      people who would rather it were checkable than asserted.
+    </p>
+  </footer>
+</Landing>
+
+<style>
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 1.25rem 1.25rem 0;
+  }
+
+  .wordmark {
+    font-family: var(--font-mono);
+    font-weight: 650;
+    font-size: 15px;
+    color: var(--fg);
+    text-decoration: none;
+    letter-spacing: -0.01em;
+  }
+
+  .nav nav {
+    display: flex;
+    gap: 1.25rem;
+    font-size: 14px;
+  }
+
+  .nav nav a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+
+  .nav nav a:hover {
+    color: var(--fg);
+  }
+
+  main {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 1.25rem 4rem;
+  }
+
+  section {
+    margin-top: 5rem;
+  }
+
+  .hero {
+    margin-top: 4.5rem;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 6vw, 3.25rem);
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    margin: 0 0 1rem;
+    font-weight: 660;
+  }
+
+  h2 {
+    font-size: clamp(1.25rem, 3vw, 1.6rem);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.9rem;
+    font-weight: 640;
+  }
+
+  h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+    font-weight: 600;
+  }
+
+  p {
+    max-width: var(--measure);
+  }
+
+  .measure {
+    max-width: var(--measure);
+  }
+
+  .lede {
+    font-size: clamp(1rem, 2.2vw, 1.25rem);
+    line-height: 1.5;
+    color: var(--fg);
+    max-width: 34em;
+    margin: 0 0 1.75rem;
+  }
+
+  .hero-links {
+    margin: 1.25rem 0 0;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .hero-links a {
+    text-decoration: none;
+  }
+
+  .hero-links a:hover {
+    text-decoration: underline;
+  }
+
+  .sep {
+    margin: 0 0.6rem;
+    color: var(--line);
+  }
+
+  .badges {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin: 1.75rem 0 0;
+    opacity: 0.85;
+  }
+
+  .badges img {
+    height: 20px;
+    width: auto;
+    display: block;
+  }
+
+  .band {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--panel);
+    padding: 1.75rem 1.75rem 1.5rem;
+  }
+
+  .band p:last-child {
+    margin-bottom: 0;
+  }
+
+  .caption {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 0.75rem;
+  }
+
+  .not {
+    border-left: 2px solid var(--line);
+    padding-left: 1.1rem;
+    margin-top: 2rem;
+  }
+
+  .not p {
+    margin: 0;
+    color: var(--muted);
+  }
+
+  .steps {
+    max-width: var(--measure);
+    padding-left: 1.2rem;
+    margin: 0 0 2rem;
+  }
+
+  .steps li {
+    margin-bottom: 0.7rem;
+  }
+
+  .steps strong {
+    font-weight: 620;
+  }
+
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+    margin-top: 1.5rem;
+  }
+
+  /* Grid items default to min-width:auto, so a wide <pre> or <table> pushes
+     its track past the container instead of scrolling inside it. */
+  .pair > * {
+    min-width: 0;
+  }
+
+  .pair > div p,
+  .pair figure p {
+    max-width: none;
+  }
+
+  .scroll {
+    overflow-x: auto;
+  }
+
+  figure {
+    margin: 0;
+  }
+
+  figcaption {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  .pair pre {
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--panel);
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .pair pre code {
+    font-size: inherit;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--line);
+    padding: 6px 8px;
+  }
+
+  td {
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+
+  tr:last-child td {
+    border-bottom: 0;
+  }
+
+  td.num,
+  th.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pill {
+    display: inline-block;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .pill.p0 {
+    border-color: var(--bad);
+    color: var(--bad);
+  }
+
+  .untested {
+    color: var(--warn);
+  }
+
+  .refusals {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .refusal {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--panel);
+    padding: 1.25rem 1.35rem;
+  }
+
+  .refusal h3 {
+    text-transform: none;
+    letter-spacing: -0.01em;
+    font-size: 0.95rem;
+    color: var(--fg);
+    font-weight: 620;
+  }
+
+  .refusal p {
+    margin: 0;
+    max-width: none;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .honest {
+    color: var(--muted);
+    font-size: 14px;
+    border-left: 2px solid var(--warn);
+    padding-left: 1.1rem;
+  }
+
+  .cta {
+    display: inline-block;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.9rem;
+    text-decoration: none;
+    font-size: 14px;
+  }
+
+  .cta:hover {
+    border-color: var(--accent);
+  }
+
+  .shot {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    max-height: 520px;
+    margin: 1.5rem 0;
+    position: relative;
+  }
+
+  /* The report shot is 2051px tall. Cropping it and fading the cut edge says
+     "there is more of this" without pretending the page ends there. */
+  .shot::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 140px;
+    background: linear-gradient(to bottom, transparent, var(--bg));
+    pointer-events: none;
+  }
+
+  .shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  footer {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 4rem;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  footer p {
+    max-width: var(--measure);
+  }
+
+  @media (max-width: 720px) {
+    .pair,
+    .refusals {
+      grid-template-columns: 1fr;
+    }
+
+    section {
+      margin-top: 3.5rem;
+    }
+
+    .hero {
+      margin-top: 3rem;
+    }
+  }
+</style>
+
+<style is:global>
+  /* Shared with the terminal cards, which render their content through a slot
+     and so are outside this component's scoped styles. */
+  .ok {
+    color: var(--ok);
+  }
+
+  .warn {
+    color: var(--warn);
+  }
+
+  .bad {
+    color: var(--bad);
+  }
+
+  .b {
+    font-weight: 650;
+    color: var(--fg);
+  }
+
+  .dim {
+    color: var(--muted);
+    opacity: 0.75;
+  }
+
+  .prompt {
+    color: var(--accent);
+  }
+
+  .cmd {
+    color: var(--fg);
+    font-weight: 600;
+  }
+</style>

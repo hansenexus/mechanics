@@ -1,0 +1,80 @@
+---
+/**
+ * The install line. Copying it is the only action this page really wants, so
+ * it gets a button rather than asking for a triple-click.
+ *
+ * The button is added by script and hidden without it, so a reader with
+ * scripting off sees a plain, selectable command rather than a dead control.
+ */
+interface Props {
+  command: string;
+}
+
+const { command } = Astro.props;
+---
+
+<div class="copy" data-command={command}>
+  <code>{command}</code>
+  <button type="button" hidden aria-label={`Copy: ${command}`}>copy</button>
+</div>
+
+<script>
+  for (const el of document.querySelectorAll<HTMLElement>(".copy")) {
+    const button = el.querySelector("button");
+    const command = el.dataset.command;
+    if (!button || !command || !navigator.clipboard) continue;
+
+    button.hidden = false;
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(command);
+        button.textContent = "copied";
+        setTimeout(() => {
+          button.textContent = "copy";
+        }, 1600);
+      } catch {
+        // Clipboard access can be refused outright (permissions, insecure
+        // context). Saying so beats a button that silently does nothing.
+        button.textContent = "copy failed";
+      }
+    });
+  }
+</script>
+
+<style>
+  .copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--panel);
+    padding: 0.55rem 0.6rem 0.55rem 0.9rem;
+    max-width: 100%;
+  }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--fg);
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  button {
+    font: inherit;
+    font-size: 12px;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.2rem 0.55rem;
+    cursor: pointer;
+    flex: none;
+  }
+
+  button:hover {
+    color: var(--fg);
+    border-color: var(--muted);
+  }
+</style>

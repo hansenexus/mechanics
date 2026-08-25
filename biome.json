@@ -54,7 +54,8 @@
       "!**/dist",
       "!**/fixtures",
       "!**/template",
-      "!**/examples"
+      "!**/examples",
+      "!**/site"
     ]
   }
 }
