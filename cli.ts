@@ -30,6 +30,7 @@ import { REPO_ROOT } from "./fsutil";
 import { mapImpact } from "./impact";
 import { appDir, appPath } from "./layout";
 import { buildManifest, emitManifest, loadManifest, onboardedApps } from "./manifest";
+import { planScaffold, stubPath } from "./scaffold";
 import { validateScreens } from "./screens";
 import type {
   CoverageBucket,
@@ -565,30 +566,34 @@ async function runScaffold(args: Args) {
     const mechDir = path.join(REPO_ROOT, appPath(slug, REPO_ROOT, "mechanics"));
     const configPath = path.join(mechDir, "_config.yaml");
     if (!(await pathExistsLocal(configPath))) {
+      // Same template init uses, not a copy of it. Two templates for one
+      // strict schema is how the old copy came to emit keys the schema had
+      // never accepted.
+      const { appConfigYaml, detect } = await import("./init");
       await fs.mkdir(mechDir, { recursive: true });
-      await fs.writeFile(configPath, defaultConfigYaml(), "utf8");
+      await fs.writeFile(
+        configPath,
+        appConfigYaml(detect(appDir(slug, REPO_ROOT), REPO_ROOT)),
+        "utf8"
+      );
       console.log(`[mechanics] wrote ${appPath(slug, REPO_ROOT, "mechanics", "_config.yaml")}`);
     }
 
+    // Plan first, write second: what to emit is pure and tested in
+    // `scaffold.test.ts`; only the skip-if-exists rule lives here.
+    const plan = planScaffold(routes);
     let created = 0;
-    const areaOrders = new Map<string, number>();
-    for (const route of routes) {
-      const { area, slug: fileSlug } = routeToStub(route);
-      const areaDir = path.join(mechDir, area);
-      await fs.mkdir(areaDir, { recursive: true });
-      const areaMeta = path.join(areaDir, "_area.yaml");
-      if (!(await pathExistsLocal(areaMeta))) {
-        const order = areaOrders.size + 1;
-        areaOrders.set(area, order);
-        await fs.writeFile(
-          areaMeta,
-          `title: ${titleCase(area)}\norder: ${order}\ndescription: TODO\n`,
-          "utf8"
-        );
-      }
-      const stub = path.join(areaDir, `${fileSlug}.md`);
-      if (await pathExistsLocal(stub)) continue;
-      await fs.writeFile(stub, stubMarkdown(route), "utf8");
+    for (const area of plan.areas) {
+      const target = stubPath(mechDir, area.relPath);
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      if (await pathExistsLocal(target)) continue;
+      await fs.writeFile(target, area.content, "utf8");
+    }
+    for (const stub of plan.stubs) {
+      const target = stubPath(mechDir, stub.relPath);
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      if (await pathExistsLocal(target)) continue;
+      await fs.writeFile(target, stub.content, "utf8");
       created++;
     }
     console.log(
@@ -608,69 +613,6 @@ async function runScaffold(args: Args) {
       );
     }
   }
-}
-
-function routeToStub(route: string): { area: string; slug: string } {
-  const segs = route
-    .split("/")
-    .filter(Boolean)
-    .map((s) =>
-      s
-        .replace(/[[\]().@]/g, "")
-        .replace(/\.{3}/g, "")
-        .toLowerCase()
-    )
-    .filter((s) => s.length > 0);
-  if (segs.length === 0) return { area: "overview", slug: "home" };
-  const [first, ...rest] = segs;
-  return {
-    area: first ?? "overview",
-    slug: rest.length > 0 ? rest.join("-") : "index",
-  };
-}
-
-function titleCase(s: string): string {
-  return s.replace(/(^|-)(\w)/g, (_, sep, c) => `${sep === "-" ? " " : ""}${c.toUpperCase()}`);
-}
-
-function defaultConfigYaml(): string {
-  return `testGlobs:
-  - "e2e/**/*.spec.ts"
-e2eRunner: bun-script
-coverage:
-  enforce: warn
-  ignoreRoutes: []
-  ignoreApiRoutes: []
-  ignoreConvexFunctions: []
-`;
-}
-
-function stubMarkdown(route: string): string {
-  return `---
-title: "TODO: describe the behavior at ${route}"
-kind: user-facing
-status: draft
-priority: p1
-roles: [viewer]
-routes: ["${route}"]
----
-
-## Story
-
-TODO — As a <role>, I can … so that ….
-
-## Acceptance Criteria
-
-- **AC1** Given … When … Then ….
-
-## Edge Cases
-
-- TODO
-
-## Error States
-
-- TODO
-`;
 }
 
 async function pathExistsLocal(p: string): Promise<boolean> {
