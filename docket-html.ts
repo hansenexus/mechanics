@@ -219,6 +219,28 @@ function detail(r) {
     ? "<h3>Decisions</h3><ul class=\\"crit\\">" + r.decisions.map((d) =>
         "<li><span></span><span>" + esc(d.decision) + "</span></li>").join("") + "</ul>"
     : "";
+  // Defensive "|| []" like decisions above: a state.json written before
+  // proposals existed has no such key, and a board that throws on old derived
+  // state is a board nobody can open after an upgrade.
+  const openProposals = (r.proposals || []).filter((p) => p.status === "open");
+  const proposals = (r.proposals || []).length
+    ? '<h3>Proposals' +
+      (openProposals.length
+        ? ' <span class="warn">(' + openProposals.length + " open)</span>"
+        : "") +
+      '</h3><ul class="crit">' +
+      (r.proposals || [])
+        .map(
+          (p) =>
+            "<li><span>" +
+            esc(p.status === "open" ? "…" : p.status === "accepted" ? "✓" : "✗") +
+            "</span><span>" +
+            esc(p.subject || p.proposal) +
+            "</span></li>"
+        )
+        .join("") +
+      "</ul>"
+    : "";
   const malformed = r.malformed
     ? '<p class="warn">' + r.malformed +
       " unparseable line(s) in events.jsonl — likely a killed writer</p>"
@@ -227,7 +249,7 @@ function detail(r) {
   return '<div class="detail">' + blocked + '<div class="phases">' + phases + "</div>" +
     "<h3>Exit criteria</h3><ul class=\\"crit\\">" +
     (rows.length ? rows.join("") : '<li class="note">none declared</li>') +
-    "</ul>" + decisions + gallery + malformed + "</div>";
+    "</ul>" + decisions + proposals + gallery + malformed + "</div>";
 }
 
 function render(runs) {

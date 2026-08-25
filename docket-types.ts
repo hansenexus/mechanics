@@ -81,6 +81,9 @@ export type EventType =
   | "handoff.requested"
   | "decision.recorded"
   | "note.added"
+  | "proposal.raised"
+  | "proposal.accepted"
+  | "proposal.rejected"
   | "git.linked"
   | "ci.status";
 
@@ -100,6 +103,9 @@ export const KNOWN_EVENT_TYPES: ReadonlySet<string> = new Set<EventType>([
   "handoff.requested",
   "decision.recorded",
   "note.added",
+  "proposal.raised",
+  "proposal.accepted",
+  "proposal.rejected",
   "git.linked",
   "ci.status",
 ]);
@@ -174,6 +180,21 @@ export type CriterionState = {
   by?: Actor;
 };
 
+export type ProposalStatus = "open" | "accepted" | "rejected";
+
+export type ProposalState = {
+  proposal: string;
+  /** What the proposer suggests doing — free text, e.g. a gap class. */
+  kind?: string;
+  subject?: string;
+  status: ProposalStatus;
+  /** Run-relative path of the patch, when one was attached. */
+  patch?: string;
+  /** Who resolved it, once it is not `open`. */
+  resolvedBy?: string;
+  at: string;
+};
+
 export type RunState = {
   run: string;
   title: string;
@@ -193,6 +214,15 @@ export type RunState = {
   git?: { branch?: string; pr?: number; sha?: string };
   ci?: { state: string; at: string };
   decisions: { decision: string; title?: string; at: string }[];
+  /**
+   * Latest state per proposal id. Deliberately does NOT feed `liveness`: an
+   * open proposal is not a block. `gate.blocked` means "I cannot proceed";
+   * a proposal means "here is something you might take". Collapsing the two
+   * would make `waiting` mean two different things on one board — and worse,
+   * `reduceRun` clears `blocked` on any progress event, so a proposal wearing
+   * a gate would be silently resolved by the next unrelated note.
+   */
+  proposals: ProposalState[];
   evidence: { kind: string; path: string; phase?: string; at: string }[];
   lastEventAt: string | null;
   eventCount: number;

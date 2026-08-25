@@ -443,6 +443,9 @@ async function cmdEvent(flags: Flags): Promise<void> {
     "result",
     "until",
     "body",
+    "proposal",
+    "subject",
+    "patch",
   ]) {
     const v = flag(flags, key);
     if (v !== undefined) payload[key] = v;
@@ -495,6 +498,13 @@ async function cmdShow(flags: Flags): Promise<void> {
   if (state.decisions.length) {
     console.log("");
     for (const d of state.decisions) console.log(`  decision  ${d.decision}`);
+  }
+  if (state.proposals.length) {
+    console.log("");
+    for (const p of state.proposals) {
+      const mark = p.status === "open" ? "…" : p.status === "accepted" ? "✓" : "✗";
+      console.log(`  ${mark} proposal  ${p.proposal}${p.subject ? `  ${p.subject}` : ""}`);
+    }
   }
   if (state.malformed) {
     console.log("");

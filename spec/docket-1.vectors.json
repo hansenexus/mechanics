@@ -19,7 +19,9 @@
           "run": "2026-01-05-example",
           "seq": 1,
           "type": "gate.blocked",
-          "actor": { "kind": "agent" },
+          "actor": {
+            "kind": "agent"
+          },
           "reason": "which retention window?",
           "needs": "human"
         },
@@ -29,12 +31,17 @@
           "run": "2026-01-05-example",
           "seq": 2,
           "type": "session.heartbeat",
-          "actor": { "kind": "hook" }
+          "actor": {
+            "kind": "hook"
+          }
         }
       ],
       "expect": {
         "liveness": "waiting",
-        "blocked": { "reason": "which retention window?", "needs": "human" }
+        "blocked": {
+          "reason": "which retention window?",
+          "needs": "human"
+        }
       }
     },
     {
@@ -54,7 +61,9 @@
           "run": "2026-01-05-example",
           "seq": 1,
           "type": "gate.blocked",
-          "actor": { "kind": "agent" },
+          "actor": {
+            "kind": "agent"
+          },
           "reason": "needs a decision",
           "needs": "human"
         },
@@ -64,11 +73,15 @@
           "run": "2026-01-05-example",
           "seq": 2,
           "type": "session.idle",
-          "actor": { "kind": "hook" },
+          "actor": {
+            "kind": "hook"
+          },
           "reason": "turn ended"
         }
       ],
-      "expect": { "liveness": "waiting" }
+      "expect": {
+        "liveness": "waiting"
+      }
     },
     {
       "name": "any event clears idle, heartbeat included",
@@ -87,7 +100,9 @@
           "run": "2026-01-05-example",
           "seq": 1,
           "type": "session.idle",
-          "actor": { "kind": "hook" },
+          "actor": {
+            "kind": "hook"
+          },
           "reason": "turn ended"
         },
         {
@@ -96,10 +111,14 @@
           "run": "2026-01-05-example",
           "seq": 2,
           "type": "session.heartbeat",
-          "actor": { "kind": "hook" }
+          "actor": {
+            "kind": "hook"
+          }
         }
       ],
-      "expect": { "liveness": "working" }
+      "expect": {
+        "liveness": "working"
+      }
     },
     {
       "name": "idleness decays to stalled",
@@ -118,11 +137,15 @@
           "run": "2026-01-05-example",
           "seq": 1,
           "type": "session.idle",
-          "actor": { "kind": "hook" },
+          "actor": {
+            "kind": "hook"
+          },
           "reason": "turn ended"
         }
       ],
-      "expect": { "liveness": "stalled" }
+      "expect": {
+        "liveness": "stalled"
+      }
     },
     {
       "name": "a pass without evidence is not a pass",
@@ -141,13 +164,21 @@
           "run": "2026-01-05-example",
           "seq": 1,
           "type": "criterion.evaluated",
-          "actor": { "kind": "agent" },
+          "actor": {
+            "kind": "agent"
+          },
           "criterion": "a:AC1",
           "verdict": "pass",
           "method": "agent"
         }
       ],
-      "expect": { "progress": { "met": 0, "total": 1 }, "criteria": [] }
+      "expect": {
+        "progress": {
+          "met": 0,
+          "total": 1
+        },
+        "criteria": []
+      }
     },
     {
       "name": "the latest verdict for a criterion wins",
@@ -166,7 +197,9 @@
           "run": "2026-01-05-example",
           "seq": 1,
           "type": "criterion.evaluated",
-          "actor": { "kind": "agent" },
+          "actor": {
+            "kind": "agent"
+          },
           "criterion": "a:AC1",
           "verdict": "pass",
           "method": "e2e",
@@ -178,15 +211,25 @@
           "run": "2026-01-05-example",
           "seq": 2,
           "type": "criterion.evaluated",
-          "actor": { "kind": "human" },
+          "actor": {
+            "kind": "human"
+          },
           "criterion": "a:AC1",
           "verdict": "fail",
           "method": "manual"
         }
       ],
       "expect": {
-        "progress": { "met": 0, "total": 1 },
-        "criteria": [{ "criterion": "a:AC1", "verdict": "fail" }]
+        "progress": {
+          "met": 0,
+          "total": 1
+        },
+        "criteria": [
+          {
+            "criterion": "a:AC1",
+            "verdict": "fail"
+          }
+        ]
       }
     },
     {
@@ -206,7 +249,9 @@
           "run": "2026-01-05-example",
           "seq": 1,
           "type": "criterion.evaluated",
-          "actor": { "kind": "agent" },
+          "actor": {
+            "kind": "agent"
+          },
           "criterion": "b:AC9",
           "verdict": "pass",
           "method": "e2e",
@@ -214,8 +259,16 @@
         }
       ],
       "expect": {
-        "progress": { "met": 0, "total": 1 },
-        "criteria": [{ "criterion": "b:AC9", "verdict": "pass" }]
+        "progress": {
+          "met": 0,
+          "total": 1
+        },
+        "criteria": [
+          {
+            "criterion": "b:AC9",
+            "verdict": "pass"
+          }
+        ]
       }
     },
     {
@@ -235,7 +288,9 @@
           "run": "2026-01-05-example",
           "seq": 1,
           "type": "criterion.evaluated",
-          "actor": { "kind": "agent" },
+          "actor": {
+            "kind": "agent"
+          },
           "criterion": "a:AC1",
           "verdict": "n-a",
           "method": "manual"
@@ -246,14 +301,21 @@
           "run": "2026-01-05-example",
           "seq": 2,
           "type": "criterion.evaluated",
-          "actor": { "kind": "agent" },
+          "actor": {
+            "kind": "agent"
+          },
           "criterion": "a:AC2",
           "verdict": "pass",
           "method": "e2e",
           "evidence": "e2e/a.spec.ts"
         }
       ],
-      "expect": { "progress": { "met": 2, "total": 2 } }
+      "expect": {
+        "progress": {
+          "met": 2,
+          "total": 2
+        }
+      }
     },
     {
       "name": "an unknown event type is activity, not an error",
@@ -272,7 +334,9 @@
           "run": "2026-01-05-example",
           "seq": 1,
           "type": "phase.entered",
-          "actor": { "kind": "agent" },
+          "actor": {
+            "kind": "agent"
+          },
           "phase": "scope"
         },
         {
@@ -281,7 +345,9 @@
           "run": "2026-01-05-example",
           "seq": 2,
           "type": "budget.exhausted",
-          "actor": { "kind": "agent" },
+          "actor": {
+            "kind": "agent"
+          },
           "spent": 500000
         }
       ],
@@ -309,7 +375,9 @@
           "run": "2026-01-05-example",
           "seq": 1,
           "type": "gate.blocked",
-          "actor": { "kind": "agent" },
+          "actor": {
+            "kind": "agent"
+          },
           "reason": "abandoned",
           "needs": "human"
         },
@@ -319,11 +387,16 @@
           "run": "2026-01-05-example",
           "seq": 2,
           "type": "run.finished",
-          "actor": { "kind": "human" },
+          "actor": {
+            "kind": "human"
+          },
           "result": "abandoned"
         }
       ],
-      "expect": { "liveness": "done", "result": "abandoned" }
+      "expect": {
+        "liveness": "done",
+        "result": "abandoned"
+      }
     },
     {
       "name": "an empty log is stalled, not working",
@@ -336,7 +409,12 @@
       },
       "now": "2026-01-05T10:00:00.000Z",
       "events": [],
-      "expect": { "liveness": "stalled", "phase": null, "eventCount": 0, "lastEventAt": null }
+      "expect": {
+        "liveness": "stalled",
+        "phase": null,
+        "eventCount": 0,
+        "lastEventAt": null
+      }
     },
     {
       "name": "a claim expires rather than locking",
@@ -355,11 +433,170 @@
           "run": "2026-01-05-example",
           "seq": 1,
           "type": "run.claimed",
-          "actor": { "kind": "agent", "session": "s1" },
+          "actor": {
+            "kind": "agent",
+            "session": "s1"
+          },
           "until": "2026-01-05T10:30:00.000Z"
         }
       ],
-      "expect": { "claimActive": false }
+      "expect": {
+        "claimActive": false
+      }
+    },
+    {
+      "name": "a proposal does not block the run",
+      "why": "A proposal is a suggestion; gate.blocked is an inability to proceed. Collapsing them makes `waiting` mean two things on one board, and because any progress event clears a block, a proposal wearing a gate would be silently resolved by the next unrelated note.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1"],
+        "phases": ["scope"]
+      },
+      "now": "2026-01-05T10:00:20.000Z",
+      "events": [
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.000Z",
+          "run": "2026-01-05-example",
+          "seq": 1,
+          "type": "phase.entered",
+          "actor": {
+            "kind": "agent"
+          },
+          "phase": "scope"
+        },
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:10.000Z",
+          "run": "2026-01-05-example",
+          "seq": 2,
+          "type": "proposal.raised",
+          "actor": {
+            "kind": "agent"
+          },
+          "proposal": "g1",
+          "kind": "unclaimed-surface",
+          "subject": "/login"
+        }
+      ],
+      "expect": {
+        "liveness": "working",
+        "proposals": [
+          {
+            "proposal": "g1",
+            "status": "open"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the latest resolution of a proposal wins",
+      "why": "Append-only means a correction is a new event, not an edit. A reader that keeps the first resolution reports a proposal as accepted after it was withdrawn.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1"],
+        "phases": ["scope"]
+      },
+      "now": "2026-01-05T10:00:30.000Z",
+      "events": [
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.000Z",
+          "run": "2026-01-05-example",
+          "seq": 1,
+          "type": "proposal.raised",
+          "actor": {
+            "kind": "agent"
+          },
+          "proposal": "g1",
+          "kind": "broad-ignore",
+          "subject": "src/workers/_*.ts"
+        },
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:10.000Z",
+          "run": "2026-01-05-example",
+          "seq": 2,
+          "type": "proposal.accepted",
+          "actor": {
+            "kind": "human",
+            "identity": "alex"
+          },
+          "proposal": "g1"
+        },
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:20.000Z",
+          "run": "2026-01-05-example",
+          "seq": 3,
+          "type": "proposal.rejected",
+          "actor": {
+            "kind": "human",
+            "identity": "alex"
+          },
+          "proposal": "g1",
+          "reason": "landed a different way"
+        }
+      ],
+      "expect": {
+        "proposals": [
+          {
+            "proposal": "g1",
+            "status": "rejected",
+            "subject": "src/workers/_*.ts"
+          }
+        ]
+      }
+    },
+    {
+      "name": "an older reader ignores proposal events without rejecting the log",
+      "why": "Invariant 3, applied to this protocol's own additions. A reader built before proposals existed must still derive correct liveness and progress from a log that contains them — which is what makes an additive event type safe to ship without a version bump.",
+      "order": {
+        "run": "2026-01-05-example",
+        "title": "Example",
+        "exitCriteria": ["a:AC1"],
+        "phases": ["scope"]
+      },
+      "now": "2026-01-05T10:00:30.000Z",
+      "events": [
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:00.000Z",
+          "run": "2026-01-05-example",
+          "seq": 1,
+          "type": "criterion.evaluated",
+          "actor": {
+            "kind": "agent"
+          },
+          "criterion": "a:AC1",
+          "verdict": "pass",
+          "method": "e2e",
+          "evidence": "e2e/a.spec.ts"
+        },
+        {
+          "proto": "docket/1",
+          "ts": "2026-01-05T10:00:20.000Z",
+          "run": "2026-01-05-example",
+          "seq": 2,
+          "type": "proposal.raised",
+          "actor": {
+            "kind": "agent"
+          },
+          "proposal": "g1",
+          "kind": "untested-behaviour",
+          "subject": "a.b.c"
+        }
+      ],
+      "expect": {
+        "liveness": "working",
+        "progress": {
+          "met": 1,
+          "total": 1
+        },
+        "eventCount": 2
+      }
     }
   ]
 }

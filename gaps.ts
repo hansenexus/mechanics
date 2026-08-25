@@ -26,7 +26,6 @@
 import type { Inventory } from "./adapters";
 import { buildProvenance } from "./adapters";
 import { inventoryAppKinds } from "./coverage";
-import { discoverCorpus } from "./discover";
 import { listFilesRecursive, matchesAnyGlob, REPO_ROOT } from "./fsutil";
 import { appAdapters, appDir, appPath } from "./layout";
 import { buildManifest } from "./manifest";

@@ -155,6 +155,9 @@ which is what lets a reader nest a fan-out under the session that spawned it.
 | `handoff.requested` | `to`, `reason` | the run directory is the payload |
 | `decision.recorded` | `decision` (id), `title` | see Decision records |
 | `note.added` | `body` | free-form, for humans |
+| `proposal.raised` | `proposal` (id), `kind`, `subject`, `patch` | a suggestion; does **not** block |
+| `proposal.accepted` | `proposal` | `actor.kind` MUST be `human` |
+| `proposal.rejected` | `proposal`, `reason` | any actor |
 
 **External**
 
@@ -217,6 +220,35 @@ whose turn simply ended look identical without it — which is the situation
 every agent harness leaves you in today. The last two are the pair that is
 easiest to get wrong: collapse them and either every finished turn screams for
 attention, or every crash hides behind "probably just idle".
+
+## Proposals
+
+A **proposal** is a suggestion an agent makes about the work, carrying an
+optional patch under the run's `evidence/proposals/`. It is deliberately not a
+`gate.blocked`, and the distinction is load bearing in two directions:
+
+- `gate.blocked` is an inability to proceed and a claim about a HUMAN, so it
+  renders as `waiting`. A proposal stops nothing — the run keeps moving while
+  someone considers it. Rendering both as `waiting` makes the word mean two
+  things on one board.
+- Any progress event clears `blocked`. A proposal wearing a gate would be
+  silently resolved by the next unrelated note, which is the worst kind of
+  failure: the board would say resolved and nobody would have looked.
+
+Status is derived latest-wins per `proposal` id, the same rule verdicts follow.
+
+**Only a human may accept.** Raising a proposal is a suggestion and any actor
+may make one; rejecting is declining a suggestion and grades nothing. Accepting
+asserts the suggestion was right, which is the same act as marking work green,
+and invariant 4 puts that with a person. `ci` is refused alongside the agent
+kinds deliberately — a job that auto-accepts is that failure wearing a hat.
+
+*An honest limit.* A local implementation typically infers `human` from the
+absence of an agent session variable, so a process that unsets it is
+indistinguishable from a person. This rule removes the default path; it is not
+a security boundary, and an implementation should not claim otherwise. The
+durable defence is that a proposal and its resolution are committed files
+somebody reviews.
 
 ## Decision records
 
@@ -335,7 +367,9 @@ vector nobody executes is a claim, not a test.
 The cases cover what is easiest to get wrong and worst to get wrong silently —
 the block/idle asymmetry, idle decay, `pass` without evidence,
 latest-verdict-wins, undeclared criteria, unknown event types, claim expiry,
-and the empty log.
+the empty log, and — for the proposal types, which are themselves an additive
+extension — that a reader predating them still derives correct liveness and
+progress from a log containing them.
 
 ### Version bumps
 

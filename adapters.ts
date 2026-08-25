@@ -187,7 +187,11 @@ export function createNextjsAppRouterAdapter(): SurfaceAdapter {
 /** `[item, file][]` → `item → files[]`, deduped and sorted. */
 function groupPairs(pairs: Array<[string, string]>): Record<string, string[]> {
   const out: Record<string, Set<string>> = {};
-  for (const [item, file] of pairs) (out[item] ??= new Set()).add(file);
+  for (const [item, file] of pairs) {
+    const set = out[item] ?? new Set<string>();
+    set.add(file);
+    out[item] = set;
+  }
   return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, [...v].sort()]));
 }
 
@@ -365,7 +369,8 @@ export async function buildProvenance(
   const out: Record<string, Record<string, string[]>> = {};
   for (const part of parts) {
     for (const [kind, items] of Object.entries(part)) {
-      const bucket = (out[kind] ??= {});
+      const bucket = out[kind] ?? {};
+      out[kind] = bucket;
       for (const [item, files] of Object.entries(items)) {
         if (files.length === 0) continue;
         bucket[item] = [...new Set([...(bucket[item] ?? []), ...files])].sort();
