@@ -40,7 +40,7 @@ interface PlannedFile {
   content: string;
 }
 
-interface Detection {
+export interface Detection {
   adapters: string[];
   playwrightConfig?: string;
   packageManager: "bun" | "pnpm" | "yarn" | "npm";
@@ -62,7 +62,16 @@ function findInitRoot(from: string): string {
   }
 }
 
-function detect(appRoot: string, repoRoot: string): Detection {
+/**
+ * What this repo looks like, by the only evidence that does not lie: files on
+ * disk. Exported because `scaffold` and `scan` must answer the same question
+ * the same way — a second detection implementation is a second answer, and the
+ * one that drifts is always the one nobody is looking at.
+ *
+ * An empty `adapters` is a real result, not a failure: a repo no built-in
+ * adapter matches declares its surfaces by glob under `surfaces:` instead.
+ */
+export function detect(appRoot: string, repoRoot: string): Detection {
   const adapters: string[] = [];
   if (existsSync(path.join(appRoot, "src", "app")) || existsSync(path.join(appRoot, "app"))) {
     adapters.push("nextjs-app-router");
@@ -136,7 +145,13 @@ manifestsDir: .mechanics/manifests
 `;
 }
 
-function appConfigYaml(det: Detection): string {
+/**
+ * The per-app `_config.yaml`. Exported because `scaffold` writes this same
+ * file when it runs before `init`, and it must be the SAME template: the two
+ * drifted once already, and `appConfigSchema` is `.strict()`, so the copy that
+ * fell behind emitted a config the tool then refused to load.
+ */
+export function appConfigYaml(det: Detection): string {
   const runner = det.playwrightConfig
     ? `e2eRunner: playwright
 playwrightConfig: ${det.playwrightConfig}`

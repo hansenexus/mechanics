@@ -36,6 +36,8 @@ import {
   type DocketOrder,
   type Liveness,
   NON_PROGRESS_EVENT_TYPES,
+  type ProposalState,
+  type ProposalStatus,
   type RunResult,
   type RunState,
   type Verdict,
@@ -79,6 +81,7 @@ export function reduceRun(
     progress: { met: 0, total: order.exitCriteria.length },
     liveness: "stalled",
     decisions: [],
+    proposals: [],
     evidence: [],
     lastEventAt: null,
     eventCount: 0,
@@ -159,6 +162,34 @@ export function reduceRun(
       case "decision.recorded": {
         const decision = str(p, "decision");
         if (decision) state.decisions.push({ decision, title: str(p, "title"), at: ev.ts });
+        break;
+      }
+      // Latest-wins per proposal id, the same rule verdicts follow: append-only
+      // means a correction is a NEW event, so a reader that keeps the first
+      // one reports a proposal as open after it was resolved.
+      case "proposal.raised":
+      case "proposal.accepted":
+      case "proposal.rejected": {
+        const id = str(p, "proposal");
+        if (!id) break;
+        const status: ProposalStatus =
+          ev.type === "proposal.accepted"
+            ? "accepted"
+            : ev.type === "proposal.rejected"
+              ? "rejected"
+              : "open";
+        const prior = state.proposals.find((x) => x.proposal === id);
+        const next: ProposalState = {
+          proposal: id,
+          kind: str(p, "kind") ?? prior?.kind,
+          subject: str(p, "subject") ?? prior?.subject,
+          patch: str(p, "patch") ?? prior?.patch,
+          status,
+          resolvedBy: status === "open" ? undefined : (ev.actor.identity ?? ev.actor.kind),
+          at: ev.ts,
+        };
+        if (prior) state.proposals[state.proposals.indexOf(prior)] = next;
+        else state.proposals.push(next);
         break;
       }
       case "git.linked": {

@@ -78,6 +78,21 @@ describe("docket/1 conformance vectors", () => {
             ).toEqual(want);
             break;
           }
+          case "proposals": {
+            // Per-ELEMENT projection rather than a fixed one: the spec's rule
+            // is that only asserted keys are checked, and different cases care
+            // about different fields (status always, subject sometimes). A
+            // reader carrying `at`, `patch` and `resolvedBy` as well is still
+            // conforming, so pinning them here would fail a correct reader.
+            const wants = want as Array<Record<string, unknown>>;
+            const got = state.proposals.map((p, i) =>
+              Object.fromEntries(
+                Object.keys(wants[i] ?? {}).map((k) => [k, (p as Record<string, unknown>)[k]])
+              )
+            );
+            expect(got, vector.why).toEqual(wants);
+            break;
+          }
           case "claimActive": {
             expect(state.claim !== undefined, vector.why).toBe(want);
             break;

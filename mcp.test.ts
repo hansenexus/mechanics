@@ -55,7 +55,11 @@ const HAS_CORPUS = (() => {
   }
 })();
 
-describe.skipIf(!HAS_CORPUS)("mechanics MCP", () => {
+// Deliberately OUTSIDE the corpus gate below. `listTools` needs no manifest,
+// and this assertion guards the second of the product's two refusals — so
+// running it only where a corpus happens to be committed meant it did not run
+// in this repo at all, which is the one place the server is developed.
+describe("mechanics MCP: the surface it refuses to grow", () => {
   it("advertises exactly the read tools, and no writer", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
@@ -67,9 +71,16 @@ describe.skipIf(!HAS_CORPUS)("mechanics MCP", () => {
     ]);
     // A verdict is a judgment and `pass` needs evidence; an MCP tool that let a
     // model mark its own work green is the one thing this server must not grow.
-    expect(tools.some((t) => t.name.includes("record"))).toBe(false);
+    // Matched by SHAPE, not by the single word `record`: `mechanics_accept` or
+    // `mechanics_fix` would have slipped through the old spelling untouched.
+    const writeShaped = tools
+      .map((t) => t.name)
+      .filter((n) => /record|accept|reject|apply|fix|write|set|verify|close/.test(n));
+    expect(writeShaped, "the MCP server is read-only by design").toEqual([]);
   });
+});
 
+describe.skipIf(!HAS_CORPUS)("mechanics MCP", () => {
   it("lists onboarded apps when asked for no app in particular", async () => {
     const out = await callJson("mechanics_list");
     expect(out.onboardedApps).toContain("console");

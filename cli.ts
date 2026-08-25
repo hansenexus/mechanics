@@ -30,6 +30,7 @@ import { REPO_ROOT } from "./fsutil";
 import { mapImpact } from "./impact";
 import { appDir, appPath } from "./layout";
 import { buildManifest, emitManifest, loadManifest, onboardedApps } from "./manifest";
+import { planScaffold, stubPath } from "./scaffold";
 import { validateScreens } from "./screens";
 import type {
   CoverageBucket,
@@ -61,6 +62,14 @@ type Args = {
   note?: string;
   all: boolean;
   check: boolean;
+  json: boolean;
+  fix?: string[];
+  propose: boolean;
+  run?: string;
+  scanRoots: string[];
+  adopt?: string;
+  depth?: number;
+  yes: boolean;
   resume: boolean;
   dryRun: boolean;
   // screens
@@ -138,6 +147,12 @@ async function main() {
       break;
     case "scaffold":
       await runScaffold(args);
+      break;
+    case "gaps":
+      await runGaps(args);
+      break;
+    case "scan":
+      await runScan(args);
       break;
     case "impact":
       await runImpact(args);
@@ -555,6 +570,153 @@ async function runVerify(args: Args) {
 }
 
 // ---------------------------------------------------------------------------
+// scan
+// ---------------------------------------------------------------------------
+
+async function runScan(args: Args) {
+  const { scan, resolveRoots, adopt } = await import("./scan");
+  const roots = resolveRoots(args.scanRoots, process.cwd());
+  const result = await scan({ roots, depth: args.depth });
+
+  if (args.adopt) {
+    // Adopt's refusals name a specific next step (the primary checkout to use,
+    // or the repos actually found). A stack trace would bury that under noise
+    // and read as a crash rather than an answer.
+    let init: Awaited<ReturnType<typeof adopt>>;
+    try {
+      init = await adopt(result, { target: args.adopt, app: args.app, yes: args.yes });
+    } catch (err) {
+      console.error(`[mechanics] ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+    for (const line of init.log) console.log(`  ${line}`);
+    if (!args.yes) {
+      console.log("");
+      console.log(`  nothing written. Repeat with --yes to commit to it:`);
+      console.log(
+        `    bun mechanics scan --adopt=${args.adopt}${args.app ? ` --app=${args.app}` : ""} --yes`
+      );
+    }
+    if (init.failed) process.exit(1);
+    return;
+  }
+
+  if (args.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  console.log(`  scanning ${result.roots.join(", ")}`);
+  console.log("");
+  const width = Math.max(4, ...result.repos.map((r) => r.name.length));
+  for (const r of result.repos) {
+    const stack = [
+      ...r.detection.adapters,
+      r.apps ? `${r.apps.dir}/ (${r.apps.slugs.length})` : null,
+      r.detection.packageManager,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    // A repo no built-in adapter matches is a real state with a real next
+    // step, not an empty cell — say so rather than leaving a blank that reads
+    // as "nothing to do here".
+    const mark = r.onboarded
+      ? green("onboarded")
+      : r.status === "needs-surfaces"
+        ? yellow("needs surfaces")
+        : dim("candidate");
+    const wt = r.worktrees.length ? dim(` +${r.worktrees.length} worktree(s)`) : "";
+    console.log(`  ${r.name.padEnd(width)}  ${mark.padEnd(24)} ${stack}${wt}`);
+  }
+  console.log("");
+  const adoptable = result.repos.filter((r) => !r.onboarded);
+  console.log(
+    `  ${result.repos.length} repo(s), ${adoptable.length} not onboarded` +
+      (result.orphanWorktrees.length
+        ? `, ${result.orphanWorktrees.length} worktree(s) whose primary is elsewhere`
+        : "")
+  );
+  if (result.truncated) {
+    console.log(`  ${yellow("(truncated)")} the walk hit its directory cap — narrow --root`);
+  }
+  if (adoptable.length > 0) {
+    console.log(`  onboard one with: bun mechanics scan --adopt=${adoptable[0]?.name}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// gaps
+// ---------------------------------------------------------------------------
+
+/**
+ * Report what the corpus is missing, and optionally close the mechanical part.
+ *
+ * Report-only by default. `--fix` applies the judgment-free ops and nothing
+ * else; `--propose` queues the rest onto a docket run for a person. The two
+ * lanes are deliberately separate flags rather than one "do the right thing"
+ * mode, because the second one puts work in front of a human and that should
+ * be asked for.
+ */
+async function runGaps(args: Args) {
+  const { findGaps } = await import("./gaps");
+  const { planAutoFix, applyAutoFix, DEFAULT_ALLOWED_OPS } = await import("./fix");
+  const slugs = await resolveSlugs(args);
+
+  const all: Awaited<ReturnType<typeof findGaps>> = [];
+  for (const slug of slugs) all.push(...(await findGaps(slug)));
+
+  if (args.json) {
+    console.log(JSON.stringify({ gaps: all }, null, 2));
+    return;
+  }
+
+  const auto = all.filter((g) => g.lane === "auto");
+  const propose = all.filter((g) => g.lane === "propose");
+
+  for (const g of all) {
+    const mark = g.lane === "auto" ? green("fix") : yellow("ask");
+    console.log(`  ${mark} ${g.severity} ${g.title}`);
+    if (g.lane === "propose") console.log(`        ${dim(g.suggestion)}`);
+  }
+  console.log("");
+  console.log(
+    `  ${all.length} gap(s): ${auto.length} mechanical, ${propose.length} needing a decision`
+  );
+
+  if (args.fix) {
+    const allow = args.fix.length > 0 ? (args.fix as never) : DEFAULT_ALLOWED_OPS;
+    const plan = planAutoFix(slugs[0] as string, all, { allow });
+    const res = await applyAutoFix(plan, REPO_ROOT, { dryRun: args.dryRun });
+    if (res.revertedBecause) {
+      console.error(`  ${red("(reverted)")} ${res.revertedBecause}`);
+      process.exit(1);
+    }
+    for (const f of res.written)
+      console.log(`  ${green(args.dryRun ? "would fix" : "fixed")} ${f}`);
+    for (const d of plan.deferred) console.log(`  ${dim(`deferred ${d.gap.key}: ${d.reason}`)}`);
+  }
+
+  if (args.propose) {
+    if (!args.run) {
+      console.error(
+        "[mechanics] gaps --propose needs --run=<id>. Opening a work order is a decision:\n" +
+          '  bun mechanics run new --title="close the <app> gaps"'
+      );
+      process.exit(1);
+    }
+    const { raiseProposals } = await import("./proposals");
+    const { currentCliActor } = await import("./docket-cli");
+    const { raised, skipped } = await raiseProposals(
+      REPO_ROOT,
+      args.run,
+      propose,
+      currentCliActor(args.by)
+    );
+    console.log(`  raised ${raised.length}, already queued ${skipped.length}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // scaffold
 // ---------------------------------------------------------------------------
 
@@ -565,30 +727,34 @@ async function runScaffold(args: Args) {
     const mechDir = path.join(REPO_ROOT, appPath(slug, REPO_ROOT, "mechanics"));
     const configPath = path.join(mechDir, "_config.yaml");
     if (!(await pathExistsLocal(configPath))) {
+      // Same template init uses, not a copy of it. Two templates for one
+      // strict schema is how the old copy came to emit keys the schema had
+      // never accepted.
+      const { appConfigYaml, detect } = await import("./init");
       await fs.mkdir(mechDir, { recursive: true });
-      await fs.writeFile(configPath, defaultConfigYaml(), "utf8");
+      await fs.writeFile(
+        configPath,
+        appConfigYaml(detect(appDir(slug, REPO_ROOT), REPO_ROOT)),
+        "utf8"
+      );
       console.log(`[mechanics] wrote ${appPath(slug, REPO_ROOT, "mechanics", "_config.yaml")}`);
     }
 
+    // Plan first, write second: what to emit is pure and tested in
+    // `scaffold.test.ts`; only the skip-if-exists rule lives here.
+    const plan = planScaffold(routes);
     let created = 0;
-    const areaOrders = new Map<string, number>();
-    for (const route of routes) {
-      const { area, slug: fileSlug } = routeToStub(route);
-      const areaDir = path.join(mechDir, area);
-      await fs.mkdir(areaDir, { recursive: true });
-      const areaMeta = path.join(areaDir, "_area.yaml");
-      if (!(await pathExistsLocal(areaMeta))) {
-        const order = areaOrders.size + 1;
-        areaOrders.set(area, order);
-        await fs.writeFile(
-          areaMeta,
-          `title: ${titleCase(area)}\norder: ${order}\ndescription: TODO\n`,
-          "utf8"
-        );
-      }
-      const stub = path.join(areaDir, `${fileSlug}.md`);
-      if (await pathExistsLocal(stub)) continue;
-      await fs.writeFile(stub, stubMarkdown(route), "utf8");
+    for (const area of plan.areas) {
+      const target = stubPath(mechDir, area.relPath);
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      if (await pathExistsLocal(target)) continue;
+      await fs.writeFile(target, area.content, "utf8");
+    }
+    for (const stub of plan.stubs) {
+      const target = stubPath(mechDir, stub.relPath);
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      if (await pathExistsLocal(target)) continue;
+      await fs.writeFile(target, stub.content, "utf8");
       created++;
     }
     console.log(
@@ -608,69 +774,6 @@ async function runScaffold(args: Args) {
       );
     }
   }
-}
-
-function routeToStub(route: string): { area: string; slug: string } {
-  const segs = route
-    .split("/")
-    .filter(Boolean)
-    .map((s) =>
-      s
-        .replace(/[[\]().@]/g, "")
-        .replace(/\.{3}/g, "")
-        .toLowerCase()
-    )
-    .filter((s) => s.length > 0);
-  if (segs.length === 0) return { area: "overview", slug: "home" };
-  const [first, ...rest] = segs;
-  return {
-    area: first ?? "overview",
-    slug: rest.length > 0 ? rest.join("-") : "index",
-  };
-}
-
-function titleCase(s: string): string {
-  return s.replace(/(^|-)(\w)/g, (_, sep, c) => `${sep === "-" ? " " : ""}${c.toUpperCase()}`);
-}
-
-function defaultConfigYaml(): string {
-  return `testGlobs:
-  - "e2e/**/*.spec.ts"
-e2eRunner: bun-script
-coverage:
-  enforce: warn
-  ignoreRoutes: []
-  ignoreApiRoutes: []
-  ignoreConvexFunctions: []
-`;
-}
-
-function stubMarkdown(route: string): string {
-  return `---
-title: "TODO: describe the behavior at ${route}"
-kind: user-facing
-status: draft
-priority: p1
-roles: [viewer]
-routes: ["${route}"]
----
-
-## Story
-
-TODO — As a <role>, I can … so that ….
-
-## Acceptance Criteria
-
-- **AC1** Given … When … Then ….
-
-## Edge Cases
-
-- TODO
-
-## Error States
-
-- TODO
-`;
 }
 
 async function pathExistsLocal(p: string): Promise<boolean> {
@@ -778,6 +881,10 @@ function parseArgs(argv: string[]): Args {
     command: argv[0] ?? "",
     all: false,
     check: false,
+    json: false,
+    propose: false,
+    scanRoots: [],
+    yes: false,
     resume: false,
     dryRun: false,
     keepPng: false,
@@ -788,6 +895,17 @@ function parseArgs(argv: string[]): Args {
     const a = argv[i];
     if (!a) continue;
     if (a === "--all") out.all = true;
+    else if (a === "--json") out.json = true;
+    else if (a === "--propose") out.propose = true;
+    // Empty means "whatever fix.ts considers safe by default" — resolved
+    // there rather than duplicated here, so the two cannot drift.
+    else if (a === "--fix") out.fix = [];
+    else if (a.startsWith("--fix=")) out.fix = a.slice(6).split(",").filter(Boolean);
+    else if (a.startsWith("--run=")) out.run = a.slice(6);
+    else if (a.startsWith("--root=")) out.scanRoots.push(a.slice(7));
+    else if (a.startsWith("--adopt=")) out.adopt = a.slice(8);
+    else if (a.startsWith("--depth=")) out.depth = Number(a.slice(8));
+    else if (a === "--yes") out.yes = true;
     else if (a === "--check") out.check = true;
     else if (a === "--resume") out.resume = true;
     else if (a === "--dry-run") out.dryRun = true;
@@ -833,6 +951,11 @@ function usage() {
       "  bun mechanics verify --app=<s> --wave=<w>       Run linked specs, merge into wave YAML",
       "  bun mechanics verify ... --set <id>=<status> --method=<m> --evidence=<e> --by=<who>",
       "  bun mechanics scaffold --app=<slug>             Draft stubs for unclaimed routes",
+      "  bun mechanics gaps --app=<slug> | --all [--json] What the corpus is missing",
+      "  bun mechanics gaps --app=<s> --fix[=ops]        Apply only the mechanical gaps",
+      "  bun mechanics gaps --app=<s> --propose --run=<id>  Queue the rest for a human",
+      "  bun mechanics scan [--root=<dir>] [--depth=N] [--json]   Repos here, and their stacks",
+      "  bun mechanics scan --adopt=<repo> [--app=<slug>] [--yes]  Onboard one of them",
       "  bun mechanics impact --app=<slug> --base=<ref>  Changed files → claiming mechanics",
       "  bun mechanics screens --app=<s> --wave=<w> --checkpoint=<before|after|...>",
       "                [--routes=/a,/b] [--base-url=u] [--viewport=WxH] [--suffix=mobile]",
@@ -844,6 +967,9 @@ function usage() {
       "  bun mechanics run event --run=<id> --type=<t>   Append to a run's event log",
       "  bun mechanics run show --run=<id>               Phases, criteria, evidence",
       "  bun mechanics run rebuild --run=<id> | --all    Regenerate state.json from events",
+      "  bun mechanics run proposals --run=<id>          What is queued for review",
+      "  bun mechanics run accept --run=<id> --proposal=<id> [--apply]   (human only)",
+      "  bun mechanics run reject --run=<id> --proposal=<id> --reason=…",
     ].join("\n")
   );
 }

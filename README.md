@@ -17,10 +17,12 @@ redesign, and the reason it works is that the answer is checkable rather than
 asserted.
 
 ```bash
+mechanics scan                     # every repo here, its stack, whether it is onboarded
 mechanics init                     # set a repo up: config, corpus skeleton, CI, MCP
 mechanics check --all              # corpus + waves + coverage
 mechanics build --all --check      # drift gate
 mechanics coverage --app=<slug>    # the table, the gaps, wave rollups
+mechanics gaps --app=<slug>        # what is missing, split into fix / ask
 mechanics report --html            # one self-contained page
 mechanics mcp                      # serve the corpus to an agent over stdio
 mechanics run list                 # the docket/1 board
@@ -47,6 +49,24 @@ build step, no server, no external request. Attach it to a PR, or open it from
 
 Every one of those is generated from [`examples/perch`](./examples/perch) by
 `bun run docs:shots`, so they are the real CLI's real output on a real corpus.
+
+## Onboarding more than one repo
+
+`mechanics scan` inventories the checkouts under a directory and says which
+could be onboarded — stack, detected adapters, monorepo layout, and whether a
+config is already there. It collapses linked worktrees into their primary
+checkout, which is the difference between an honest count and a list that
+reports one monorepo eleven times.
+
+```bash
+mechanics scan --root=~/repos              # the inventory
+mechanics scan --adopt=<repo>              # what init would write — nothing yet
+mechanics scan --adopt=<repo> --yes        # write it
+```
+
+There is no adopt-all, and no prompt: naming the repo is half the confirmation
+and `--yes` is the other half, so the command behaves the same in a script as
+in a terminal.
 
 ## Start here
 
@@ -84,6 +104,7 @@ corpus's life:
 | **Adapters** | `nextjs-app-router`, `convex`, `generic-glob` — plus the `SurfaceAdapter` seam, so a stack nobody wrote an adapter for declares its surfaces in config instead of forking |
 | **MCP** | five read tools over stdio: list, get, coverage, wave status, diff impact |
 | **Report** | `--html`: one file, no build step, no external request |
+| **Gaps** | the five gap classes as predicates, each tagged `auto` (one correct answer) or `propose` (a judgment) — `gaps --fix` applies the first kind and refuses the rest in code |
 | **[docket/1](./spec/docket-1.md)** | the run protocol — work orders with checkable exit criteria and an append-only event log, with [executable conformance vectors](./spec/docket-1.vectors.json) |
 | **[Plugin](./plugin/)** | three Claude Code skills: init, verify, gaps |
 
@@ -93,10 +114,20 @@ corpus's life:
 write time and again at read time. A hand-edited log cannot slip one through.
 
 **Let a model mark its own work green.** The MCP server is read-only, and a
-test asserts no tool with `record` in its name is advertised. Verdicts go
-through `mechanics verify`, which runs the specs, or `verify --set`, which is a
-deliberate human action. Both of those are the whole value of the format; a
-convenient way around them would be a way of destroying it.
+test asserts no write-shaped tool name is advertised. Verdicts go through
+`mechanics verify`, which runs the specs, or `verify --set`, which is a
+deliberate human action. The same line runs through the agent loop: an agent
+may fix what has one correct answer, and may raise or reject a proposal, but
+`mechanics run accept` refuses any actor that is not human — accepting asserts
+a suggestion was right, which is the same act as marking work green. Both of
+those refusals are the whole value of the format; a convenient way around them
+would be a way of destroying it.
+
+*Stated plainly, because the alternative is overclaiming:* the actor check
+infers `human` from the absence of an agent session variable, so a process that
+unsets it is indistinguishable from a person. It removes the default path and
+nothing more. The durable boundary is that proposals and their resolutions are
+committed files somebody reviews.
 
 ## Runtime
 

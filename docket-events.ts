@@ -167,6 +167,23 @@ export async function appendEvent(
   ) {
     throw new Error("docket: a pass verdict requires evidence (docket/1 invariant 5)");
   }
+  // Raising a proposal is a suggestion and anyone may make one. ACCEPTING it
+  // is a judgment that the suggestion was right, which is the same act as
+  // marking work green — so it is a human's, and `ci` is refused alongside the
+  // agent kinds because a job that auto-accepts is that failure in a hat.
+  //
+  // Honest limit, stated here rather than overclaimed: `currentActor` infers
+  // `human` from the ABSENCE of CLAUDE_CODE_SESSION_ID, so a process that
+  // unsets it is indistinguishable from a person. This removes the default
+  // path and nothing more. The durable boundary is that a proposal and its
+  // resolution are committed files someone reviews.
+  if (input.type === "proposal.accepted" && input.actor.kind !== "human") {
+    throw new Error(
+      `docket: only a human may accept a proposal — actor.kind is "${input.actor.kind}". ` +
+        "An agent that can accept its own proposal is an agent grading its own work " +
+        "(docket/1 invariant 4)"
+    );
+  }
 
   const dir = runDir(repoRoot, runId);
   await fs.mkdir(dir, { recursive: true });

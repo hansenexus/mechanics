@@ -70,6 +70,16 @@ export interface RepoLayout {
   apps: Map<string, AppLayout> | null;
   /** Repo-relative POSIX parent of every app, when apps are discovered. */
   appsDir: string | null;
+  /**
+   * Repo-level adapter names and glob surfaces, applied to every DISCOVERED
+   * app. Carried here because a discovered app has no entry of its own to read
+   * them from — without this field the config's `adapters:`/`surfaces:` are
+   * parsed, validated, and then silently dropped, so a monorepo could never
+   * declare a glob surface and `init --app=<slug>`'s generated `adapters:`
+   * block had no effect at all.
+   */
+  adapters: string[];
+  surfaces: GlobSurfaceSpec[];
 }
 
 const CACHE = new Map<string, RepoLayout>();
@@ -108,6 +118,8 @@ function buildLayout(repoRoot: string, config: RepoMechanicsConfig): RepoLayout 
   const base = {
     repoRoot,
     manifestsDir: normalizeDir(config.manifestsDir),
+    adapters: config.adapters,
+    surfaces: config.surfaces,
   };
 
   if (config.apps.length > 0) {
@@ -173,7 +185,7 @@ export function appLayout(appSlug: string, repoRoot = REPO_ROOT): AppLayout {
     return {
       slug: appSlug,
       dir: joinRel(layout.appsDir ?? "apps", appSlug),
-      adapters: resolveAdapters(DEFAULT_CONFIG.adapters, [], appSlug),
+      adapters: resolveAdapters(layout.adapters, layout.surfaces, appSlug),
     };
   }
   const found = layout.apps.get(appSlug);

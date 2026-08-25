@@ -17,6 +17,7 @@ function board(over: Partial<BoardRun> = {}): BoardRun {
     progress: { met: 0, total: 1 },
     liveness: "working",
     decisions: [],
+    proposals: [],
     evidence: [],
     lastEventAt: "2026-08-08T12:00:00.000Z",
     eventCount: 1,
@@ -103,5 +104,36 @@ describe("resolveEvidencePath", () => {
   it("refuses a run id that is not a run id", () => {
     expect(resolveEvidencePath(REPO, "../../../etc", "passwd")).toBeNull();
     expect(resolveEvidencePath(REPO, "not-a-run", "a.webp")).toBeNull();
+  });
+});
+
+const OPTS = { live: false, generatedAt: "2026-08-08T12:00:00.000Z" };
+
+describe("the embedded client script", () => {
+  it("parses as JavaScript", () => {
+    // The board's client half is a template literal, so `tsc` never sees it as
+    // code and no test reached it either: a stray backtick in a comment inside
+    // that literal is a silently broken page. Parsing it here is the cheapest
+    // thing that would have caught it.
+    const html = renderPage([board()], OPTS);
+    const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+    expect(script, "renderPage should embed a client script").toBeTruthy();
+    expect(() => new Function(script as string)).not.toThrow();
+  });
+
+  it("renders open proposals without choking on state.json from before they existed", () => {
+    const legacy = { ...board(), proposals: undefined } as unknown as BoardRun;
+    expect(() => renderPage([legacy], OPTS)).not.toThrow();
+    const html = renderPage(
+      [
+        board({
+          proposals: [
+            { proposal: "g1", subject: "/login", status: "open", at: "2026-08-08T12:00:00.000Z" },
+          ],
+        }),
+      ],
+      OPTS
+    );
+    expect(html).toContain("g1");
   });
 });

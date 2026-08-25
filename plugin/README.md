@@ -7,7 +7,7 @@ Three skills for working with a behaviour-spec corpus, in any repo that has a
 |---|---|
 | `mechanics-init` | onboarding an app: scaffold the tree, fan out one authoring agent per area, consolidate, build the manifest |
 | `mechanics-verify` | running a verification wave: specs, then agent-driven ACs, then the manual checklist for destructive behaviours |
-| `mechanics-gaps` | auditing what the corpus is missing, and closing the gaps that need no judgment |
+| `mechanics-gaps` | auditing what the corpus is missing, closing the mechanical gaps, and proposing the rest to a human |
 
 They assume the `mechanics` CLI is on PATH (`npm i -D @hansenexus/mechanics`,
 or `bunx @hansenexus/mechanics`). Nothing here is specific to a stack, a CI
@@ -36,7 +36,9 @@ the corpus path, the command prefix, and the PR mechanism, and stop there.
 
 ## What no skill here will do
 
-Record a verification verdict on your behalf without evidence, add an ignore
-glob to make a gap disappear, or auto-merge anything. Those are the three moves
-that turn a corpus into decoration, and they are refused on purpose rather than
-merely discouraged.
+Record a verification verdict on your behalf without evidence, add or widen an
+ignore glob to make a gap disappear, accept its own proposal, or auto-merge
+anything. Those are the moves that turn a corpus into decoration, and they are
+refused in code rather than merely discouraged: `mechanics gaps --fix` throws
+on the forbidden ops, and `mechanics run accept` refuses any actor that is not
+human.

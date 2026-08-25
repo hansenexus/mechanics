@@ -132,3 +132,49 @@ describe("order", () => {
     );
   });
 });
+
+describe("only a human may accept a proposal", () => {
+  // The table is the point. `mcp.test.ts` pins the read-only tool surface the
+  // same way, and for the same reason: the refusal is the product, so it is
+  // asserted against every actor kind rather than the one that occurred to
+  // whoever wrote the feature.
+  const KINDS: Array<Actor["kind"]> = ["agent", "subagent", "hook", "ci", "human"];
+
+  it.each(KINDS)("actor.kind %s", async (kind) => {
+    const actor: Actor = { kind, identity: kind };
+    const accept = () =>
+      appendEvent(repo, RUN, {
+        type: "proposal.accepted",
+        actor,
+        payload: { proposal: "g1" },
+      });
+
+    if (kind === "human") {
+      await expect(accept()).resolves.toMatchObject({ type: "proposal.accepted" });
+    } else {
+      // `ci` is refused alongside the agent kinds deliberately: a job that
+      // auto-accepts is the same failure wearing a different hat.
+      await expect(accept()).rejects.toThrow(/only a human may accept a proposal/);
+    }
+  });
+
+  it("lets any actor RAISE one — suggesting is not deciding", async () => {
+    await expect(
+      appendEvent(repo, RUN, {
+        type: "proposal.raised",
+        actor: AGENT,
+        payload: { proposal: "g1", kind: "unclaimed-surface", subject: "/login" },
+      })
+    ).resolves.toMatchObject({ type: "proposal.raised" });
+  });
+
+  it("lets any actor REJECT one — declining a suggestion grades nothing", async () => {
+    await expect(
+      appendEvent(repo, RUN, {
+        type: "proposal.rejected",
+        actor: AGENT,
+        payload: { proposal: "g1", reason: "superseded" },
+      })
+    ).resolves.toMatchObject({ type: "proposal.rejected" });
+  });
+});

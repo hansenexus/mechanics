@@ -67,7 +67,17 @@ function fail(msg: string): never {
  * for scripted producers.
  */
 function currentActor(flags: Flags): Actor {
-  const by = flag(flags, "by");
+  return currentCliActor(flag(flags, "by"));
+}
+
+/**
+ * Exported so the corpus CLI derives the actor the same way rather than
+ * inventing a second answer. Which matters more than usual here: an actor
+ * inferred two ways is an actor that can be `agent` in one command and
+ * `human` in another, and the proposal-acceptance refusal turns on exactly
+ * that field.
+ */
+export function currentCliActor(by?: string): Actor {
   const session = process.env.CLAUDE_CODE_SESSION_ID;
   if (by === "hook") return { kind: "hook", harness: "claude-code", session };
   if (by === "ci") return { kind: "ci", identity: process.env.CI_JOB ?? "ci" };
@@ -110,6 +120,15 @@ export async function runDocketCli(argv: string[]): Promise<void> {
       break;
     case "attach":
       await cmdAttach(flags);
+      break;
+    case "proposals":
+      await cmdProposals(flags);
+      break;
+    case "accept":
+      await cmdAccept(flags);
+      break;
+    case "reject":
+      await cmdReject(flags);
       break;
     case "which":
       await cmdWhich(flags);
@@ -359,6 +378,74 @@ async function cmdAttach(flags: Flags): Promise<void> {
   console.log(`[docket] ${runId} attached to session ${session.slice(0, 8)}`);
 }
 
+// ---------------------------------------------------------------------------
+// proposals
+// ---------------------------------------------------------------------------
+
+async function cmdProposals(flags: Flags): Promise<void> {
+  const runId = flag(flags, "run") ?? fail("run proposals: --run is required");
+  const { listProposals } = await import("./proposals");
+  const records = await listProposals(REPO_ROOT, runId);
+  if (records.length === 0) {
+    console.log(`[docket] ${runId}: no proposals`);
+    return;
+  }
+  // Status comes from the LOG, never from the record — the record is content,
+  // and a second copy of status on disk is a second thing to keep true.
+  const state = await proposalStatuses(runId);
+  for (const r of records) {
+    const status = state.get(r.proposal) ?? "open";
+    const mark = status === "open" ? "…" : status === "accepted" ? "✓" : "✗";
+    console.log(`  ${mark} ${r.proposal}`);
+    console.log(`      ${r.title}`);
+    console.log(`      ${r.suggestion}${r.op ? `  [applies: ${r.op.kind}]` : ""}`);
+  }
+}
+
+async function cmdAccept(flags: Flags): Promise<void> {
+  const runId = flag(flags, "run") ?? fail("run accept: --run is required");
+  const id = flag(flags, "proposal") ?? fail("run accept: --proposal is required");
+  const { acceptProposal } = await import("./proposals");
+  const actor = currentActor(flags);
+
+  // The refusal is the most important message this command can print, so it
+  // reads as a decision rather than a crash. A stack trace here would look
+  // like the tool broke, and the next move would be to work around it.
+  if (actor.kind !== "human") {
+    fail(
+      `run accept: only a human may accept a proposal — you are "${actor.kind}".\n` +
+        "         Accepting asserts the suggestion was right, which is the same act as\n" +
+        "         marking work green. Ask a person to run this, or reject it with a reason."
+    );
+  }
+
+  const res = await acceptProposal(REPO_ROOT, runId, id, actor, {
+    apply: flags.apply === true,
+  });
+  if (res.revertedBecause) {
+    console.error(`[docket] ${id}: accepted, but the edit was reverted — ${res.revertedBecause}`);
+    process.exit(1);
+  }
+  console.log(`[docket] accepted ${id}`);
+  for (const f of res.written) console.log(`  wrote ${f}`);
+}
+
+async function cmdReject(flags: Flags): Promise<void> {
+  const runId = flag(flags, "run") ?? fail("run reject: --run is required");
+  const id = flag(flags, "proposal") ?? fail("run reject: --proposal is required");
+  const reason = flag(flags, "reason") ?? fail("run reject: --reason is required");
+  const { rejectProposal } = await import("./proposals");
+  await rejectProposal(REPO_ROOT, runId, id, reason, currentActor(flags));
+  console.log(`[docket] rejected ${id}`);
+}
+
+/** Proposal id → derived status, read back out of the event log. */
+async function proposalStatuses(runId: string): Promise<Map<string, string>> {
+  const order = await loadOrder(REPO_ROOT, runId);
+  const { events } = await readEvents(REPO_ROOT, runId);
+  return new Map(reduceRun(order, events).proposals.map((p) => [p.proposal, p.status]));
+}
+
 /** What the hooks would resolve right now — the debugging surface for a
  * binding that guessed wrong. */
 async function cmdWhich(flags: Flags): Promise<void> {
@@ -443,6 +530,9 @@ async function cmdEvent(flags: Flags): Promise<void> {
     "result",
     "until",
     "body",
+    "proposal",
+    "subject",
+    "patch",
   ]) {
     const v = flag(flags, key);
     if (v !== undefined) payload[key] = v;
@@ -495,6 +585,13 @@ async function cmdShow(flags: Flags): Promise<void> {
   if (state.decisions.length) {
     console.log("");
     for (const d of state.decisions) console.log(`  decision  ${d.decision}`);
+  }
+  if (state.proposals.length) {
+    console.log("");
+    for (const p of state.proposals) {
+      const mark = p.status === "open" ? "…" : p.status === "accepted" ? "✓" : "✗";
+      console.log(`  ${mark} proposal  ${p.proposal}${p.subject ? `  ${p.subject}` : ""}`);
+    }
   }
   if (state.malformed) {
     console.log("");

@@ -71,4 +71,7 @@ in a multi-app one; `mechanics.config.yaml` decides. Never hardcode either.
   pending / fail / blocked.
 - Never write `pass` without an evidence string. The CLI refuses, and so should
   you.
+- Never accept your own proposal. Raise one, reject one — but accepting asserts
+  the suggestion was right, which is the same act as marking work green. The
+  CLI refuses, and so should you.
 - Never verify against production. Dev or staging only.

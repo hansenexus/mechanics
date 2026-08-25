@@ -110,6 +110,32 @@ describe("layout: apps under appsDir", () => {
     ]);
   });
 
+  it("applies the repo-level adapters and surfaces to a discovered app", async () => {
+    // The whole point of declaring `adapters:`/`surfaces:` alongside `appsDir`
+    // is that discovered apps inherit them. They used to be parsed, validated
+    // and then dropped on the floor: `appLayout` fell back to the built-in
+    // defaults, so a monorepo could not declare a glob surface at all and the
+    // `adapters:` block `init --app=<slug>` generates did nothing.
+    const root = await tmp();
+    await write(
+      root,
+      "mechanics.config.yaml",
+      `appsDir: apps
+manifestsDir: packages/mechanics/manifests
+adapters: ["convex"]
+surfaces:
+  - kind: worker
+    label: background worker
+    globs: ["src/workers/*.ts"]
+`
+    );
+    expect(appAdapters("console", root).map((a) => a.name)).toEqual(["convex", "generic-glob"]);
+    const kinds = appAdapters("console", root).flatMap((a) => a.kinds.map((k) => k.kind));
+    expect(kinds).toContain("worker");
+    // The default that was being forced on every discovered app is gone.
+    expect(kinds).not.toContain("route");
+  });
+
   it("falls back to the monorepo shape when no config exists", async () => {
     const root = await tmp();
     expect(appPath("console", root, "mechanics")).toBe("apps/console/mechanics");
