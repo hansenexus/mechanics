@@ -72,6 +72,18 @@ export interface SurfaceAdapter {
    * handle `undefined`.
    */
   inventory(ctx: AdapterContext): Promise<Record<string, string[]>>;
+  /**
+   * The reverse of `inventory`: item → the source file(s) that produced it,
+   * keyed by kind. Used to fill a mechanic's `paths:` from its claims, which
+   * is what makes `mechanics impact` able to answer "I touched these files,
+   * whose behaviour did I break?" for a stack it has no heuristics for.
+   *
+   * Optional, and an adapter that cannot answer honestly must answer NOTHING
+   * — omit the kind, or omit the item. A guessed implementing file does not
+   * stay a guess: it lands in a mechanic's `paths:`, `check` then blesses it,
+   * and the corpus has quietly recorded a fact nobody established.
+   */
+  provenance?(ctx: AdapterContext): Promise<Record<string, Record<string, string[]>>>;
 }
 
 export interface Inventory {
@@ -127,6 +139,25 @@ async function nextjsRoutes(ctx: AdapterContext): Promise<string[]> {
     .map((f) => pageFileToRoute(f.replace(/^src\/app\//, "")));
 }
 
+/** Page files → the route each one serves. The file IS the provenance. */
+function nextjsPageFiles(ctx: AdapterContext): Array<[route: string, file: string]> {
+  return ctx.files
+    .filter(
+      (f) => f.startsWith("src/app/") && /\/page\.tsx?$/.test(f) && !f.startsWith("src/app/api/")
+    )
+    .map((f) => [pageFileToRoute(f.replace(/^src\/app\//, "")), f]);
+}
+
+/** API route handlers → the endpoint each one serves. */
+function nextjsApiFiles(ctx: AdapterContext): Array<[route: string, file: string]> {
+  return ctx.files
+    .filter((f) => f.startsWith("src/app/api/") && /\/route\.tsx?$/.test(f))
+    .map((f) => [
+      normalizeRoutePattern(`/${f.replace(/^src\/app\//, "").replace(/\/route\.tsx?$/, "")}`),
+      f,
+    ]);
+}
+
 export function createNextjsAppRouterAdapter(): SurfaceAdapter {
   return {
     name: "nextjs-app-router",
@@ -135,14 +166,29 @@ export function createNextjsAppRouterAdapter(): SurfaceAdapter {
       { kind: "api-route", label: "API route", legacyClaimKey: "apiRoutes" },
     ],
     async inventory(ctx) {
-      const apiRoutes = ctx.files
-        .filter((f) => f.startsWith("src/app/api/") && /\/route\.tsx?$/.test(f))
-        .map((f) =>
-          normalizeRoutePattern(`/${f.replace(/^src\/app\//, "").replace(/\/route\.tsx?$/, "")}`)
-        );
-      return { route: await nextjsRoutes(ctx), "api-route": apiRoutes };
+      return {
+        route: await nextjsRoutes(ctx),
+        "api-route": nextjsApiFiles(ctx).map(([route]) => route),
+      };
+    },
+    async provenance(ctx) {
+      // Derived from the FILE scan even when `inventory` preferred the
+      // dev-routes manifest: a manifest entry has no file behind it, so a
+      // route only present there is one this cannot answer for, and it is
+      // simply absent from the map.
+      return {
+        route: groupPairs(nextjsPageFiles(ctx)),
+        "api-route": groupPairs(nextjsApiFiles(ctx)),
+      };
     },
   };
+}
+
+/** `[item, file][]` → `item → files[]`, deduped and sorted. */
+function groupPairs(pairs: Array<[string, string]>): Record<string, string[]> {
+  const out: Record<string, Set<string>> = {};
+  for (const [item, file] of pairs) (out[item] ??= new Set()).add(file);
+  return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, [...v].sort()]));
 }
 
 // ---------------------------------------------------------------------------
@@ -164,18 +210,7 @@ export function createConvexAdapter(): SurfaceAdapter {
     ],
     async inventory(ctx) {
       const convexFunctions: string[] = [];
-      // `_generated` is codegen and `lib/` is helpers — neither is a public
-      // surface anyone could claim, so counting them would only inflate the
-      // unclaimed list.
-      const convexFiles = ctx.files.filter(
-        (f) =>
-          f.startsWith("convex/") &&
-          f.endsWith(".ts") &&
-          !f.startsWith("convex/_generated/") &&
-          !f.startsWith("convex/lib/") &&
-          !f.endsWith(".test.ts") &&
-          !f.endsWith(".d.ts")
-      );
+      const convexFiles = convexSourceFiles(ctx);
       for (const rel of convexFiles) {
         const content = await fs.readFile(path.join(ctx.appDir, rel), "utf8");
         const base = rel.replace(/^convex\//, "").replace(/\.ts$/, "");
@@ -190,7 +225,44 @@ export function createConvexAdapter(): SurfaceAdapter {
         "http-endpoint": await scanFile(ctx, "convex/http.ts", HTTP_PATH_RE),
       };
     },
+    async provenance(ctx) {
+      // `<module>.<fn>` came out of `convex/<module>.ts` by construction, and
+      // crons and HTTP endpoints are only ever scanned out of their one
+      // declaring file. Nothing here is inferred.
+      const fns: Record<string, string[]> = {};
+      for (const rel of convexSourceFiles(ctx)) {
+        const content = await fs.readFile(path.join(ctx.appDir, rel), "utf8");
+        const base = rel.replace(/^convex\//, "").replace(/\.ts$/, "");
+        for (const m of content.matchAll(CONVEX_FN_RE)) {
+          if (m[1]) fns[`${base}.${m[1]}`] = [rel];
+        }
+      }
+      const single = async (rel: string, re: RegExp) =>
+        Object.fromEntries((await scanFile(ctx, rel, re)).map((item) => [item, [rel]]));
+      return {
+        "convex-function": fns,
+        cron: await single("convex/crons.ts", CRON_NAME_RE),
+        "http-endpoint": await single("convex/http.ts", HTTP_PATH_RE),
+      };
+    },
   };
+}
+
+/**
+ * Convex modules that are a public surface. `_generated` is codegen and
+ * `lib/` is helpers — neither is claimable, so counting them would only
+ * inflate the unclaimed list.
+ */
+function convexSourceFiles(ctx: AdapterContext): string[] {
+  return ctx.files.filter(
+    (f) =>
+      f.startsWith("convex/") &&
+      f.endsWith(".ts") &&
+      !f.startsWith("convex/_generated/") &&
+      !f.startsWith("convex/lib/") &&
+      !f.endsWith(".test.ts") &&
+      !f.endsWith(".d.ts")
+  );
 }
 
 async function scanFile(ctx: AdapterContext, rel: string, re: RegExp): Promise<string[]> {
@@ -241,6 +313,17 @@ export function createGenericGlobAdapter(specs: GlobSurfaceSpec[]): SurfaceAdapt
       }
       return out;
     },
+    async provenance(ctx) {
+      // Identity: for a glob-declared kind the item IS the file path, so this
+      // is the one adapter whose provenance cannot be wrong.
+      const out: Record<string, Record<string, string[]>> = {};
+      for (const spec of specs) {
+        out[spec.kind] = Object.fromEntries(
+          ctx.files.filter((f) => matchesAnyGlob(f, spec.globs)).map((f) => [f, [f]])
+        );
+      }
+      return out;
+    },
   };
 }
 
@@ -264,6 +347,34 @@ export function defaultAdapters(): SurfaceAdapter[] {
  * through config — a `generic-glob` surface named `route` — which means the
  * message has to name both adapters to be actionable.
  */
+/**
+ * Every adapter's `provenance`, merged: kind → item → source files.
+ *
+ * An adapter without the method contributes nothing, and so does an item it
+ * declined to answer for. Absence here means "unknown", never "none" — a
+ * caller filling in a mechanic's `paths:` must treat a missing item as a
+ * question it cannot answer rather than as an empty answer.
+ */
+export async function buildProvenance(
+  adapters: SurfaceAdapter[],
+  ctx: AdapterContext
+): Promise<Record<string, Record<string, string[]>>> {
+  const parts = await Promise.all(
+    adapters.map(async (a) => (a.provenance ? await a.provenance(ctx) : {}))
+  );
+  const out: Record<string, Record<string, string[]>> = {};
+  for (const part of parts) {
+    for (const [kind, items] of Object.entries(part)) {
+      const bucket = (out[kind] ??= {});
+      for (const [item, files] of Object.entries(items)) {
+        if (files.length === 0) continue;
+        bucket[item] = [...new Set([...(bucket[item] ?? []), ...files])].sort();
+      }
+    }
+  }
+  return out;
+}
+
 export async function buildInventory(
   adapters: SurfaceAdapter[],
   ctx: AdapterContext

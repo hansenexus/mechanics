@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   type AdapterContext,
   buildInventory,
+  buildProvenance,
   createConvexAdapter,
   createGenericGlobAdapter,
   createNextjsAppRouterAdapter,
@@ -208,5 +209,59 @@ describe("legacy claim keys", () => {
       ["cron", "crons"],
       ["http-endpoint", "httpEndpoints"],
     ]);
+  });
+});
+
+describe("provenance: item → the file that produced it", () => {
+  it("maps a route and an API route back to their handler files", async () => {
+    const files = ["src/app/page.tsx", "src/app/orders/page.tsx", "src/app/api/hooks/route.ts"];
+    const prov = await createNextjsAppRouterAdapter().provenance?.(await ctx(files));
+    expect(prov?.route).toEqual({
+      "/": ["src/app/page.tsx"],
+      "/orders": ["src/app/orders/page.tsx"],
+    });
+    expect(prov?.["api-route"]).toEqual({ "/api/hooks": ["src/app/api/hooks/route.ts"] });
+  });
+
+  it("maps a convex function to its module, and a cron to crons.ts", async () => {
+    await write("convex/monitors.ts", "export const list = query(() => {});\n");
+    await write("convex/crons.ts", 'crons.daily("nightly-sweep", {}, api.x.y);\n');
+    const prov = await createConvexAdapter().provenance?.(
+      await ctx(["convex/monitors.ts", "convex/crons.ts"])
+    );
+    expect(prov?.["convex-function"]).toEqual({ "monitors.list": ["convex/monitors.ts"] });
+    expect(prov?.cron).toEqual({ "nightly-sweep": ["convex/crons.ts"] });
+  });
+
+  it("is the identity for a glob-declared kind, where the item IS the file", async () => {
+    const files = ["src/workers/sweep.ts", "src/workers/mail.ts"];
+    const adapter = createGenericGlobAdapter([{ kind: "worker", globs: ["src/workers/*.ts"] }]);
+    expect(await adapter.provenance?.(await ctx(files))).toEqual({
+      worker: {
+        "src/workers/sweep.ts": ["src/workers/sweep.ts"],
+        "src/workers/mail.ts": ["src/workers/mail.ts"],
+      },
+    });
+  });
+
+  it("omits an item it cannot answer for rather than guessing a file", async () => {
+    // A route present only in the dev-routes manifest has no page file behind
+    // it. The honest answer is silence: a guessed path would land in a
+    // mechanic's `paths:` and `check` would then bless it as established fact.
+    await fs.mkdir(path.join(repo, "packages", "dev-routes", "manifests"), { recursive: true });
+    await fs.writeFile(
+      path.join(repo, "packages", "dev-routes", "manifests", "demo.routes.json"),
+      JSON.stringify({ routes: [{ pattern: "/generated-only" }] }),
+      "utf8"
+    );
+    const c = await ctx(["src/app/page.tsx"]);
+    const adapter = createNextjsAppRouterAdapter();
+    expect((await adapter.inventory(c)).route).toContain("/generated-only");
+    expect(Object.keys((await adapter.provenance?.(c))?.route ?? {})).toEqual(["/"]);
+  });
+
+  it("contributes nothing for an adapter that does not implement it", async () => {
+    const bare = stub("bare", ["thing"], { thing: ["a"] });
+    expect(await buildProvenance([bare], await ctx([]))).toEqual({});
   });
 });
