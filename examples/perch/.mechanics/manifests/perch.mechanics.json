@@ -1,0 +1,1095 @@
+{
+  "schemaVersion": 2,
+  "appSlug": "perch",
+  "mechanicCount": 25,
+  "surfaces": [
+    {
+      "kind": "route",
+      "label": "route"
+    },
+    {
+      "kind": "api-route",
+      "label": "API route"
+    },
+    {
+      "kind": "convex-function",
+      "label": "Convex function"
+    },
+    {
+      "kind": "cron",
+      "label": "cron"
+    },
+    {
+      "kind": "http-endpoint",
+      "label": "HTTP endpoint"
+    },
+    {
+      "kind": "worker",
+      "label": "background worker"
+    }
+  ],
+  "areas": [
+    {
+      "slug": "monitors",
+      "title": "Monitors",
+      "order": 1,
+      "description": "Defining what to watch, and running the checks that watch it.",
+      "mechanicCount": 10
+    },
+    {
+      "slug": "incidents",
+      "title": "Incidents",
+      "order": 2,
+      "description": "Turning failing checks into something a human acknowledges and resolves.",
+      "mechanicCount": 7
+    },
+    {
+      "slug": "status-page",
+      "title": "Status page",
+      "order": 3,
+      "description": "What the public sees, and who gets told when it changes.",
+      "mechanicCount": 8
+    }
+  ],
+  "mechanics": [
+    {
+      "id": "perch.incidents.acknowledge-incident",
+      "title": "Acknowledge an open incident",
+      "kind": "user-facing",
+      "area": "incidents",
+      "status": "active",
+      "priority": "p0",
+      "roles": [
+        "admin",
+        "operator"
+      ],
+      "claims": {
+        "api-route": [
+          "/api/incidents/[id]/ack"
+        ],
+        "convex-function": [
+          "incidents.acknowledge"
+        ]
+      },
+      "paths": [
+        "convex/incidents.ts"
+      ],
+      "nonFunctional": [],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/incidents.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/incidents/acknowledge-incident.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.incidents.daily-digest",
+      "title": "Send a daily digest of yesterday",
+      "kind": "system",
+      "area": "incidents",
+      "status": "active",
+      "priority": "p2",
+      "roles": [
+        "system"
+      ],
+      "claims": {
+        "cron": [
+          "send daily digest"
+        ]
+      },
+      "paths": [
+        "convex/crons.ts"
+      ],
+      "nonFunctional": [],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [],
+      "source": "mechanics/incidents/daily-digest.md",
+      "aliases": [],
+      "verify": "agent"
+    },
+    {
+      "id": "perch.incidents.inspect-incident",
+      "title": "Read one incident's timeline",
+      "kind": "user-facing",
+      "area": "incidents",
+      "status": "active",
+      "priority": "p1",
+      "roles": [
+        "admin",
+        "operator",
+        "viewer"
+      ],
+      "claims": {
+        "route": [
+          "/dashboard/incidents/[id]"
+        ]
+      },
+      "paths": [
+        "src/app/dashboard/incidents/[id]/page.tsx"
+      ],
+      "nonFunctional": [],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/incidents.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/incidents/inspect-incident.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.incidents.list-incidents",
+      "title": "See open and recent incidents",
+      "kind": "user-facing",
+      "area": "incidents",
+      "status": "active",
+      "priority": "p0",
+      "roles": [
+        "admin",
+        "operator",
+        "viewer"
+      ],
+      "claims": {
+        "convex-function": [
+          "incidents.list"
+        ],
+        "route": [
+          "/dashboard/incidents"
+        ]
+      },
+      "paths": [
+        "src/app/dashboard/incidents/page.tsx"
+      ],
+      "nonFunctional": [],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/incidents.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/incidents/list-incidents.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.incidents.notify-on-incident",
+      "title": "Notify the configured channels when an incident opens",
+      "kind": "system",
+      "area": "incidents",
+      "status": "active",
+      "priority": "p0",
+      "roles": [
+        "system"
+      ],
+      "claims": {
+        "worker": [
+          "src/workers/notifier.ts"
+        ]
+      },
+      "paths": [
+        "src/workers/notifier.ts"
+      ],
+      "nonFunctional": [
+        "perf"
+      ],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/incidents.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/incidents/notify-on-incident.md",
+      "aliases": [],
+      "verify": "agent"
+    },
+    {
+      "id": "perch.incidents.post-incident-update",
+      "title": "Post an update to an incident",
+      "kind": "user-facing",
+      "area": "incidents",
+      "status": "active",
+      "priority": "p1",
+      "roles": [
+        "admin",
+        "operator"
+      ],
+      "claims": {
+        "convex-function": [
+          "incidents.addUpdate"
+        ]
+      },
+      "paths": [
+        "convex/incidents.ts"
+      ],
+      "nonFunctional": [
+        "i18n"
+      ],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/incidents.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/incidents/post-incident-update.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.incidents.resolve-incident",
+      "title": "Resolve an incident by hand",
+      "kind": "user-facing",
+      "area": "incidents",
+      "status": "active",
+      "priority": "p1",
+      "roles": [
+        "admin",
+        "operator"
+      ],
+      "claims": {
+        "convex-function": [
+          "incidents.resolve"
+        ]
+      },
+      "paths": [
+        "convex/incidents.ts"
+      ],
+      "nonFunctional": [],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 1,
+      "errorStateCount": 1,
+      "tests": [],
+      "source": "mechanics/incidents/resolve-incident.md",
+      "aliases": [],
+      "verify": "manual-only"
+    },
+    {
+      "id": "perch.monitors.create-monitor",
+      "title": "Create a monitor for an endpoint",
+      "kind": "user-facing",
+      "area": "monitors",
+      "status": "active",
+      "priority": "p0",
+      "roles": [
+        "admin",
+        "operator"
+      ],
+      "claims": {
+        "api-route": [
+          "/api/monitors"
+        ],
+        "convex-function": [
+          "monitors.create"
+        ],
+        "route": [
+          "/dashboard/monitors/new"
+        ]
+      },
+      "paths": [
+        "convex/monitors.ts",
+        "src/app/dashboard/monitors/new/page.tsx"
+      ],
+      "nonFunctional": [
+        "a11y"
+      ],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4"
+      ],
+      "edgeCaseCount": 3,
+      "errorStateCount": 2,
+      "tests": [
+        {
+          "spec": "e2e/monitors.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/monitors/create-monitor.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.monitors.delete-monitor",
+      "title": "Delete a monitor and its history",
+      "kind": "user-facing",
+      "area": "monitors",
+      "status": "active",
+      "priority": "p1",
+      "roles": [
+        "admin"
+      ],
+      "claims": {
+        "api-route": [
+          "/api/monitors/[id]"
+        ],
+        "convex-function": [
+          "monitors.remove"
+        ]
+      },
+      "paths": [
+        "convex/monitors.ts"
+      ],
+      "nonFunctional": [],
+      "destructive": true,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/monitors.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/monitors/delete-monitor.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.monitors.edit-monitor",
+      "title": "Change a monitor's URL, interval or name",
+      "kind": "user-facing",
+      "area": "monitors",
+      "status": "active",
+      "priority": "p1",
+      "roles": [
+        "admin",
+        "operator"
+      ],
+      "claims": {
+        "api-route": [
+          "/api/monitors/[id]"
+        ],
+        "convex-function": [
+          "monitors.update"
+        ],
+        "route": [
+          "/dashboard/monitors/[id]"
+        ]
+      },
+      "paths": [
+        "convex/monitors.ts"
+      ],
+      "nonFunctional": [],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/monitors.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/monitors/edit-monitor.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.monitors.inspect-monitor",
+      "title": "Inspect one monitor's history and uptime",
+      "kind": "user-facing",
+      "area": "monitors",
+      "status": "active",
+      "priority": "p1",
+      "roles": [
+        "admin",
+        "operator",
+        "viewer"
+      ],
+      "claims": {
+        "api-route": [
+          "/api/monitors/[id]"
+        ],
+        "convex-function": [
+          "monitors.get"
+        ],
+        "route": [
+          "/dashboard/monitors/[id]"
+        ]
+      },
+      "paths": [
+        "src/app/dashboard/monitors/[id]/page.tsx"
+      ],
+      "nonFunctional": [
+        "perf"
+      ],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/monitors.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/monitors/inspect-monitor.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.monitors.list-monitors",
+      "title": "See every monitor and its current state",
+      "kind": "user-facing",
+      "area": "monitors",
+      "status": "active",
+      "priority": "p0",
+      "roles": [
+        "admin",
+        "operator",
+        "viewer"
+      ],
+      "claims": {
+        "api-route": [
+          "/api/monitors"
+        ],
+        "convex-function": [
+          "monitors.list"
+        ],
+        "route": [
+          "/dashboard",
+          "/dashboard/monitors"
+        ]
+      },
+      "paths": [
+        "src/app/dashboard/monitors/page.tsx"
+      ],
+      "nonFunctional": [
+        "a11y",
+        "perf"
+      ],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/monitors.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/monitors/list-monitors.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.monitors.pause-monitor",
+      "title": "Pause and resume a monitor",
+      "kind": "user-facing",
+      "area": "monitors",
+      "status": "active",
+      "priority": "p1",
+      "roles": [
+        "admin",
+        "operator"
+      ],
+      "claims": {
+        "convex-function": [
+          "monitors.pause"
+        ],
+        "route": [
+          "/dashboard/monitors/[id]"
+        ]
+      },
+      "paths": [
+        "convex/monitors.ts"
+      ],
+      "nonFunctional": [],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/monitors.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/monitors/pause-monitor.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.monitors.probe-callback",
+      "title": "Accept results from an out-of-region probe",
+      "kind": "system",
+      "area": "monitors",
+      "status": "active",
+      "priority": "p1",
+      "roles": [
+        "system"
+      ],
+      "claims": {
+        "http-endpoint": [
+          "/probe-callback"
+        ]
+      },
+      "paths": [
+        "convex/http.ts"
+      ],
+      "nonFunctional": [
+        "security"
+      ],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [],
+      "source": "mechanics/monitors/probe-callback.md",
+      "aliases": [],
+      "verify": "agent"
+    },
+    {
+      "id": "perch.monitors.prune-check-history",
+      "title": "Prune check results past the retention window",
+      "kind": "system",
+      "area": "monitors",
+      "status": "active",
+      "priority": "p2",
+      "roles": [
+        "system"
+      ],
+      "claims": {
+        "cron": [
+          "prune old check results"
+        ]
+      },
+      "paths": [
+        "convex/crons.ts"
+      ],
+      "nonFunctional": [
+        "perf"
+      ],
+      "destructive": true,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [],
+      "source": "mechanics/monitors/prune-check-history.md",
+      "aliases": [],
+      "verify": "agent"
+    },
+    {
+      "id": "perch.monitors.record-check-result",
+      "title": "Record the outcome of a probe",
+      "kind": "system",
+      "area": "monitors",
+      "status": "active",
+      "priority": "p0",
+      "roles": [
+        "system"
+      ],
+      "claims": {
+        "convex-function": [
+          "checks.recordResult"
+        ]
+      },
+      "paths": [
+        "convex/checks.ts"
+      ],
+      "nonFunctional": [],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [],
+      "source": "mechanics/monitors/record-check-result.md",
+      "aliases": [],
+      "verify": "agent"
+    },
+    {
+      "id": "perch.monitors.run-due-checks",
+      "title": "Run every check that has come due",
+      "kind": "system",
+      "area": "monitors",
+      "status": "active",
+      "priority": "p0",
+      "roles": [
+        "system"
+      ],
+      "claims": {
+        "cron": [
+          "run due checks"
+        ],
+        "worker": [
+          "src/workers/probe-runner.ts"
+        ]
+      },
+      "paths": [
+        "convex/crons.ts",
+        "src/workers/probe-runner.ts"
+      ],
+      "nonFunctional": [
+        "perf"
+      ],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [],
+      "source": "mechanics/monitors/run-due-checks.md",
+      "aliases": [],
+      "verify": "agent"
+    },
+    {
+      "id": "perch.status-page.configure-notifications",
+      "title": "Choose where alerts are delivered",
+      "kind": "user-facing",
+      "area": "status-page",
+      "status": "active",
+      "priority": "p1",
+      "roles": [
+        "admin"
+      ],
+      "claims": {
+        "route": [
+          "/dashboard/settings/notifications"
+        ]
+      },
+      "paths": [
+        "src/app/dashboard/settings/notifications/page.tsx"
+      ],
+      "nonFunctional": [],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [],
+      "source": "mechanics/status-page/configure-notifications.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.status-page.confirm-subscription",
+      "title": "Confirm an email subscription",
+      "kind": "user-facing",
+      "area": "status-page",
+      "status": "active",
+      "priority": "p1",
+      "roles": [
+        "public"
+      ],
+      "claims": {
+        "convex-function": [
+          "subscribers.confirm"
+        ]
+      },
+      "paths": [
+        "convex/subscribers.ts"
+      ],
+      "nonFunctional": [
+        "security"
+      ],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 1,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/status-page.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/status-page/confirm-subscription.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.status-page.custom-domain",
+      "title": "Serve the status page from a customer domain",
+      "kind": "user-facing",
+      "area": "status-page",
+      "status": "draft",
+      "priority": "p2",
+      "roles": [
+        "admin"
+      ],
+      "claims": {},
+      "paths": [],
+      "nonFunctional": [
+        "security"
+      ],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [],
+      "source": "mechanics/status-page/custom-domain.md",
+      "aliases": []
+    },
+    {
+      "id": "perch.status-page.customise-branding",
+      "title": "Customise the status page's branding",
+      "kind": "user-facing",
+      "area": "status-page",
+      "status": "active",
+      "priority": "p2",
+      "roles": [
+        "admin"
+      ],
+      "claims": {
+        "convex-function": [
+          "statusPages.updateBranding"
+        ],
+        "route": [
+          "/dashboard/settings/status-page"
+        ]
+      },
+      "paths": [
+        "src/app/dashboard/settings/status-page/page.tsx"
+      ],
+      "nonFunctional": [
+        "a11y"
+      ],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/status-page.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/status-page/customise-branding.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.status-page.rss-feed",
+      "title": "Follow a status page by RSS",
+      "kind": "user-facing",
+      "area": "status-page",
+      "status": "deprecated",
+      "priority": "p2",
+      "roles": [
+        "public"
+      ],
+      "claims": {},
+      "paths": [],
+      "nonFunctional": [],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2"
+      ],
+      "edgeCaseCount": 1,
+      "errorStateCount": 1,
+      "tests": [],
+      "source": "mechanics/status-page/rss-feed.md",
+      "aliases": []
+    },
+    {
+      "id": "perch.status-page.subscribe-to-updates",
+      "title": "Subscribe by email to a status page",
+      "kind": "user-facing",
+      "area": "status-page",
+      "status": "active",
+      "priority": "p1",
+      "roles": [
+        "public"
+      ],
+      "claims": {
+        "api-route": [
+          "/api/status/[slug]/subscribe"
+        ],
+        "convex-function": [
+          "subscribers.subscribe"
+        ],
+        "route": [
+          "/status/[slug]/subscribe"
+        ]
+      },
+      "paths": [
+        "convex/subscribers.ts",
+        "src/app/status/[slug]/subscribe/page.tsx"
+      ],
+      "nonFunctional": [
+        "security"
+      ],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/status-page.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/status-page/subscribe-to-updates.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.status-page.unsubscribe",
+      "title": "Unsubscribe from a status page",
+      "kind": "user-facing",
+      "area": "status-page",
+      "status": "active",
+      "priority": "p1",
+      "roles": [
+        "public"
+      ],
+      "claims": {
+        "convex-function": [
+          "subscribers.unsubscribe"
+        ],
+        "http-endpoint": [
+          "/unsubscribe"
+        ]
+      },
+      "paths": [
+        "convex/http.ts",
+        "convex/subscribers.ts"
+      ],
+      "nonFunctional": [
+        "security"
+      ],
+      "destructive": true,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/status-page.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/status-page/unsubscribe.md",
+      "aliases": [],
+      "verify": "e2e"
+    },
+    {
+      "id": "perch.status-page.view-public-status",
+      "title": "View a workspace's public status page",
+      "kind": "user-facing",
+      "area": "status-page",
+      "status": "active",
+      "priority": "p0",
+      "roles": [
+        "public"
+      ],
+      "claims": {
+        "convex-function": [
+          "statusPages.get"
+        ],
+        "route": [
+          "/status/[slug]"
+        ]
+      },
+      "paths": [
+        "src/app/status/[slug]/page.tsx"
+      ],
+      "nonFunctional": [
+        "a11y",
+        "perf"
+      ],
+      "destructive": false,
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4"
+      ],
+      "edgeCaseCount": 2,
+      "errorStateCount": 1,
+      "tests": [
+        {
+          "spec": "e2e/status-page.spec.ts",
+          "runner": "bun-script",
+          "via": "annotation"
+        }
+      ],
+      "source": "mechanics/status-page/view-public-status.md",
+      "aliases": [],
+      "verify": "e2e"
+    }
+  ],
+  "coverage": {
+    "api-route": {
+      "total": 5,
+      "claimed": 4,
+      "ignored": 0,
+      "unclaimed": [
+        "/api/webhooks/stripe"
+      ]
+    },
+    "convex-function": {
+      "total": 17,
+      "claimed": 16,
+      "ignored": 0,
+      "unclaimed": [
+        "monitors.exportCsv"
+      ]
+    },
+    "cron": {
+      "total": 3,
+      "claimed": 3,
+      "ignored": 0,
+      "unclaimed": []
+    },
+    "http-endpoint": {
+      "total": 2,
+      "claimed": 2,
+      "ignored": 0,
+      "unclaimed": []
+    },
+    "route": {
+      "total": 12,
+      "claimed": 10,
+      "ignored": 0,
+      "unclaimed": [
+        "/",
+        "/login"
+      ]
+    },
+    "worker": {
+      "total": 3,
+      "claimed": 2,
+      "ignored": 1,
+      "unclaimed": []
+    }
+  },
+  "testCoverage": {
+    "withTests": 16,
+    "manualOnly": 1,
+    "untested": 8
+  }
+}

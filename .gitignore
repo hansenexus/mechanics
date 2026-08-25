@@ -1,3 +1,6 @@
 node_modules/
 dist/
 *.tgz
+
+# screenshot scratch (scripts/shots.mjs)
+.shots/

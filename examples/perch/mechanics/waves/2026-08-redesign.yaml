@@ -1,0 +1,137 @@
+wave: 2026-08-redesign
+title: Dashboard redesign — behaviour parity
+status: open
+startedAt: 2026-08-03
+baselineSha: 4f52860
+
+# System mechanics are out of scope: this wave is a front-end redesign, and
+# nothing it touches can change how the probe runner or the crons behave.
+# Narrowing the scope is what keeps the ratio meaningful — a denominator
+# padded with things the wave cannot affect makes a wave look worse than it is
+# and tells nobody anything.
+scope:
+  areas: []
+  kinds: [user-facing]
+  ids: []
+  exclude:
+    # Draft: no surface exists yet, so there is nothing to verify.
+    - perch.status-page.custom-domain
+
+# Absent entry = pending. `pass` requires evidence — there is no way to record
+# a green verdict without saying what made it green.
+verifications:
+  - mechanic: perch.monitors.create-monitor
+    status: pass
+    method: e2e
+    evidence: e2e/monitors.spec.ts
+    verifiedBy: mechanics-cli
+    verifiedAt: 2026-08-11
+
+  - mechanic: perch.monitors.edit-monitor
+    status: pass
+    method: e2e
+    evidence: e2e/monitors.spec.ts
+    verifiedBy: mechanics-cli
+    verifiedAt: 2026-08-11
+
+  - mechanic: perch.monitors.list-monitors
+    status: fail
+    method: e2e
+    evidence: e2e/monitors.spec.ts
+    failedCriteria: [AC1, AC3]
+    verifiedBy: mechanics-cli
+    verifiedAt: 2026-08-12
+    note: >-
+      The redesigned list sorts by name within state, so failing monitors are
+      no longer guaranteed onto the first page at 50+ monitors. AC1 and AC3
+      are one bug, not two.
+
+  - mechanic: perch.monitors.pause-monitor
+    status: pass
+    method: e2e
+    evidence: e2e/monitors.spec.ts
+    verifiedBy: mechanics-cli
+    verifiedAt: 2026-08-11
+
+  - mechanic: perch.monitors.inspect-monitor
+    status: fail
+    method: manual
+    evidence: https://github.com/hansenexus/perch/issues/812
+    failedCriteria: [AC2]
+    verifiedBy: jo
+    verifiedAt: 2026-08-14
+    note: The check drawer truncates the response body at 512B, not 2KB.
+
+  - mechanic: perch.monitors.delete-monitor
+    status: blocked
+    method: e2e
+    verifiedBy: mechanics-cli
+    verifiedAt: 2026-08-12
+    note: >-
+      The confirm dialog is being rebuilt on the new modal primitive; the spec
+      cannot drive it until that lands. Blocked is not pending — someone
+      looked, and the reason is written down.
+
+  - mechanic: perch.incidents.list-incidents
+    status: pass
+    method: e2e
+    evidence: e2e/incidents.spec.ts
+    verifiedBy: mechanics-cli
+    verifiedAt: 2026-08-11
+
+  - mechanic: perch.incidents.acknowledge-incident
+    status: pass
+    method: e2e
+    evidence: e2e/incidents.spec.ts
+    verifiedBy: mechanics-cli
+    verifiedAt: 2026-08-11
+
+  - mechanic: perch.incidents.inspect-incident
+    status: pass
+    method: e2e
+    evidence: e2e/incidents.spec.ts
+    verifiedBy: mechanics-cli
+    verifiedAt: 2026-08-13
+
+  - mechanic: perch.incidents.post-incident-update
+    status: pass
+    method: e2e
+    evidence: e2e/incidents.spec.ts
+    verifiedBy: mechanics-cli
+    verifiedAt: 2026-08-13
+
+  - mechanic: perch.incidents.resolve-incident
+    status: n-a
+    method: manual
+    verifiedBy: jo
+    verifiedAt: 2026-08-13
+    note: No UI of its own — reached from the incident detail view, covered there.
+
+  - mechanic: perch.status-page.view-public-status
+    status: pass
+    method: e2e
+    evidence: e2e/status-page.spec.ts
+    verifiedBy: mechanics-cli
+    verifiedAt: 2026-08-14
+
+  - mechanic: perch.status-page.subscribe-to-updates
+    status: pass
+    method: e2e
+    evidence: e2e/status-page.spec.ts
+    verifiedBy: mechanics-cli
+    verifiedAt: 2026-08-14
+
+  - mechanic: perch.status-page.customise-branding
+    status: fail
+    method: e2e
+    evidence: e2e/status-page.spec.ts
+    failedCriteria: [AC2]
+    verifiedBy: mechanics-cli
+    verifiedAt: 2026-08-14
+    note: >-
+      The new accent picker applies the chosen colour to body text directly,
+      so a light accent drops below AA. The contrast warning fires but the
+      adjusted tone is never used.
+
+  # deprecated, and the rest of status-page + configure-notifications, are
+  # deliberately left pending: this is a wave in flight, not a finished one.

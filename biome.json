@@ -48,6 +48,13 @@
     }
   },
   "files": {
-    "includes": ["**", "!**/node_modules", "!**/dist", "!**/fixtures", "!**/template"]
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/fixtures",
+      "!**/template",
+      "!**/examples"
+    ]
   }
 }

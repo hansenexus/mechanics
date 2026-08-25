@@ -1,5 +1,9 @@
 # mechanics
 
+[![npm](https://img.shields.io/npm/v/@hansenexus/mechanics?logo=npm&color=cb3837)](https://www.npmjs.com/package/@hansenexus/mechanics)
+[![ci](https://github.com/hansenexus/mechanics/actions/workflows/ci.yml/badge.svg)](https://github.com/hansenexus/mechanics/actions/workflows/ci.yml)
+[![licence](https://img.shields.io/npm/l/@hansenexus/mechanics?color=blue)](./LICENSE)
+
 Behaviour specs with a coverage ratchet.
 
 Every user-observable behaviour is one markdown file with labelled acceptance
@@ -22,6 +26,28 @@ mechanics mcp                      # serve the corpus to an agent over stdio
 mechanics run list                 # the docket/1 board
 ```
 
+## What it looks like
+
+Coverage is the whole idea: every surface the app ships, against every surface
+the corpus claims. What is left over is a gap with a name.
+
+![mechanics coverage — six surface kinds, four unclaimed surfaces named, and an open wave](https://raw.githubusercontent.com/hansenexus/mechanics/main/docs/images/coverage.png)
+
+The gate is what stops the corpus rotting. Edit a mechanic without rebuilding
+the manifest and CI says so; validation names every gap rather than totalling
+them.
+
+![the drift gate rejecting a stale manifest, and check naming each unclaimed surface](https://raw.githubusercontent.com/hansenexus/mechanics/main/docs/images/drift-gate.png)
+
+`mechanics report --html` is the same data as one self-contained page — no
+build step, no server, no external request. Attach it to a PR, or open it from
+`file://` six months later.
+
+![the HTML coverage report: surface coverage bars, wave rollup with failures, and all 25 behaviours](https://raw.githubusercontent.com/hansenexus/mechanics/main/docs/images/report.png)
+
+Every one of those is generated from [`examples/perch`](./examples/perch) by
+`bun run docs:shots`, so they are the real CLI's real output on a real corpus.
+
 ## Start here
 
 ```bash
@@ -36,10 +62,19 @@ committed manifest. `--dry-run` shows the plan; `--no-ci`, `--no-mcp`,
 `--no-docket` opt out. Then replace the starter mechanic with real behaviours —
 `mechanics scaffold --app=<slug>` drafts a stub per unclaimed surface.
 
-`template/` is the readable worked example: a runnable single-app corpus for a
-fictional backup CLI. It ships **no routes and no Convex functions** on
-purpose, so `generic-glob` carries the whole inventory and nothing works by
-accident of the built-in adapters.
+Two worked examples ship with the package, and they show opposite ends of a
+corpus's life:
+
+- **[`template/`](./template)** — what `init` gives you, and the starting
+  point for a fork: small, fully claimed, green. It ships **no routes and no
+  Convex functions** on purpose, so `generic-glob` carries the whole inventory
+  and nothing works by accident of the built-in adapters.
+- **[`examples/perch`](./examples/perch)** — a corpus part-way through its
+  life: 25 behaviours over three areas, both built-in adapters plus a
+  glob-declared kind, four deliberately unclaimed surfaces, and a redesign wave
+  in flight with failures and a blocker on it. It is what the screenshots
+  above are pictures of, and a test asserts its gaps stay exactly the four it
+  means to have.
 
 ## What is in the box
 
@@ -69,6 +104,11 @@ The `mechanics` bin is a bundled Node build (`dist/cli.js`), so both
 `npx mechanics` and `bunx mechanics` work with no Bun requirement at use time.
 The package also ships its TypeScript source, importable directly under Bun
 (≥ 1.2), which is what development and the test suite run on.
+
+Releases are published from [CI](./.github/workflows/release.yml) with npm
+provenance, so the tarball on npm carries a signed attestation tying it to this
+repository and the commit it was built from. `repository` in a package.json is
+a claim anyone can make; the attestation is the part that can be checked.
 
 ## Licence
 

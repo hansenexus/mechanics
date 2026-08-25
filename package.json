@@ -30,7 +30,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "bun build cli.ts --target=node --outdir=dist --external @modelcontextprotocol/sdk --external gray-matter --external yaml --external zod && node scripts/banner.mjs",
-    "prepublishOnly": "bun run build"
+    "prepublishOnly": "bun run build",
+    "docs:shots": "bun scripts/shots.mjs"
   },
   "publishConfig": {
     "access": "public"

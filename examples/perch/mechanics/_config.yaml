@@ -1,0 +1,17 @@
+# Specs scanned for `// @mechanic <id>` annotations. Test links are discovered
+# from these, never declared in frontmatter.
+testGlobs:
+  - "e2e/**/*.spec.ts"
+
+e2eRunner: bun-script
+
+coverage:
+  # `warn`, not `error` — this corpus is deliberately incomplete, and the
+  # gaps are the point. Flipping this to `error` is the ratchet: it is how a
+  # project says "the corpus is complete now, and it stays that way".
+  enforce: warn
+
+  ignore:
+    # Underscore-prefixed workers are debugging tools, not product behaviour.
+    worker:
+      - "src/workers/_*.ts"

@@ -1,0 +1,97 @@
+name: release
+
+# Publishes to npm from CI, with provenance.
+#
+# Provenance is the point. Published from a laptop, `repository` in
+# package.json is an unverifiable claim: anyone can point a package at any
+# repo. Published from here with `--provenance`, npm records a signed
+# attestation tying the tarball to this workflow, this repo and the exact
+# commit — which is what makes the npm page's "Repository" link mean something.
+#
+# It requires `id-token: write`, a public repo, and npm >= 9.5. The `repository`
+# URL in package.json must match this repo or npm rejects the attestation.
+#
+# Trigger: push a `v<version>` tag. The tag is the release; the workflow
+# refuses to publish if it disagrees with package.json, because a mismatch
+# would put a version on npm that no tag in this repo describes.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Pack and validate, but do not publish"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release
+      id-token: write # provenance attestation
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - run: bun install --frozen-lockfile
+
+      - name: Tag and package.json agree
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(node -p "require('./package.json').version")
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag v$tag does not match package.json $pkg"
+            exit 1
+          fi
+          echo "releasing $pkg"
+
+      - name: Gate
+        run: |
+          bun run lint
+          bun run typecheck
+          bun run test
+
+      - name: Build
+        run: bun run build
+
+      - name: Bundled CLI runs under node
+        run: node dist/cli.js --help
+
+      - name: Publish
+        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish (dry run)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: npm publish --provenance --access public --dry-run
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag
