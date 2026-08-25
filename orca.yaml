@@ -1,8 +1,15 @@
-# Orca worktree setup hook — runs in each fresh Orca-managed worktree.
+# Orca worktree hooks — run in each fresh Orca-managed worktree.
 # Single bun package, no per-app env files: installing deps is the whole
 # bootstrap. Docs: hn-infra/scripts/orca/README.md
 scripts:
   setup: |
     export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"
     cd "${ORCA_WORKTREE_PATH:-$PWD}"
-    bun install
+    bun install --frozen-lockfile || echo "orca-setup: bun install --frozen-lockfile failed — run it manually before building"
+issueCommand: |
+  Work the GitHub issue at {{artifact_url}}. Read the issue and its comments
+  first, follow this repo's CLAUDE.md conventions, and open a PR when done.
+defaultTabs:
+  - title: lint
+    command: bun run lint
+    color: "#22c55e"
