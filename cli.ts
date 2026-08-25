@@ -62,6 +62,10 @@ type Args = {
   note?: string;
   all: boolean;
   check: boolean;
+  json: boolean;
+  fix?: string[];
+  propose: boolean;
+  run?: string;
   resume: boolean;
   dryRun: boolean;
   // screens
@@ -139,6 +143,9 @@ async function main() {
       break;
     case "scaffold":
       await runScaffold(args);
+      break;
+    case "gaps":
+      await runGaps(args);
       break;
     case "impact":
       await runImpact(args);
@@ -556,6 +563,78 @@ async function runVerify(args: Args) {
 }
 
 // ---------------------------------------------------------------------------
+// gaps
+// ---------------------------------------------------------------------------
+
+/**
+ * Report what the corpus is missing, and optionally close the mechanical part.
+ *
+ * Report-only by default. `--fix` applies the judgment-free ops and nothing
+ * else; `--propose` queues the rest onto a docket run for a person. The two
+ * lanes are deliberately separate flags rather than one "do the right thing"
+ * mode, because the second one puts work in front of a human and that should
+ * be asked for.
+ */
+async function runGaps(args: Args) {
+  const { findGaps } = await import("./gaps");
+  const { planAutoFix, applyAutoFix, DEFAULT_ALLOWED_OPS } = await import("./fix");
+  const slugs = await resolveSlugs(args);
+
+  const all: Awaited<ReturnType<typeof findGaps>> = [];
+  for (const slug of slugs) all.push(...(await findGaps(slug)));
+
+  if (args.json) {
+    console.log(JSON.stringify({ gaps: all }, null, 2));
+    return;
+  }
+
+  const auto = all.filter((g) => g.lane === "auto");
+  const propose = all.filter((g) => g.lane === "propose");
+
+  for (const g of all) {
+    const mark = g.lane === "auto" ? green("fix") : yellow("ask");
+    console.log(`  ${mark} ${g.severity} ${g.title}`);
+    if (g.lane === "propose") console.log(`        ${dim(g.suggestion)}`);
+  }
+  console.log("");
+  console.log(
+    `  ${all.length} gap(s): ${auto.length} mechanical, ${propose.length} needing a decision`
+  );
+
+  if (args.fix) {
+    const allow = args.fix.length > 0 ? (args.fix as never) : DEFAULT_ALLOWED_OPS;
+    const plan = planAutoFix(slugs[0] as string, all, { allow });
+    const res = await applyAutoFix(plan, REPO_ROOT, { dryRun: args.dryRun });
+    if (res.revertedBecause) {
+      console.error(`  ${red("(reverted)")} ${res.revertedBecause}`);
+      process.exit(1);
+    }
+    for (const f of res.written)
+      console.log(`  ${green(args.dryRun ? "would fix" : "fixed")} ${f}`);
+    for (const d of plan.deferred) console.log(`  ${dim(`deferred ${d.gap.key}: ${d.reason}`)}`);
+  }
+
+  if (args.propose) {
+    if (!args.run) {
+      console.error(
+        "[mechanics] gaps --propose needs --run=<id>. Opening a work order is a decision:\n" +
+          '  bun mechanics run new --title="close the <app> gaps"'
+      );
+      process.exit(1);
+    }
+    const { raiseProposals } = await import("./proposals");
+    const { currentCliActor } = await import("./docket-cli");
+    const { raised, skipped } = await raiseProposals(
+      REPO_ROOT,
+      args.run,
+      propose,
+      currentCliActor(args.by)
+    );
+    console.log(`  raised ${raised.length}, already queued ${skipped.length}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // scaffold
 // ---------------------------------------------------------------------------
 
@@ -720,6 +799,8 @@ function parseArgs(argv: string[]): Args {
     command: argv[0] ?? "",
     all: false,
     check: false,
+    json: false,
+    propose: false,
     resume: false,
     dryRun: false,
     keepPng: false,
@@ -730,6 +811,13 @@ function parseArgs(argv: string[]): Args {
     const a = argv[i];
     if (!a) continue;
     if (a === "--all") out.all = true;
+    else if (a === "--json") out.json = true;
+    else if (a === "--propose") out.propose = true;
+    // Empty means "whatever fix.ts considers safe by default" — resolved
+    // there rather than duplicated here, so the two cannot drift.
+    else if (a === "--fix") out.fix = [];
+    else if (a.startsWith("--fix=")) out.fix = a.slice(6).split(",").filter(Boolean);
+    else if (a.startsWith("--run=")) out.run = a.slice(6);
     else if (a === "--check") out.check = true;
     else if (a === "--resume") out.resume = true;
     else if (a === "--dry-run") out.dryRun = true;
@@ -775,6 +863,9 @@ function usage() {
       "  bun mechanics verify --app=<s> --wave=<w>       Run linked specs, merge into wave YAML",
       "  bun mechanics verify ... --set <id>=<status> --method=<m> --evidence=<e> --by=<who>",
       "  bun mechanics scaffold --app=<slug>             Draft stubs for unclaimed routes",
+      "  bun mechanics gaps --app=<slug> | --all [--json] What the corpus is missing",
+      "  bun mechanics gaps --app=<s> --fix[=ops]        Apply only the mechanical gaps",
+      "  bun mechanics gaps --app=<s> --propose --run=<id>  Queue the rest for a human",
       "  bun mechanics impact --app=<slug> --base=<ref>  Changed files → claiming mechanics",
       "  bun mechanics screens --app=<s> --wave=<w> --checkpoint=<before|after|...>",
       "                [--routes=/a,/b] [--base-url=u] [--viewport=WxH] [--suffix=mobile]",
@@ -786,6 +877,9 @@ function usage() {
       "  bun mechanics run event --run=<id> --type=<t>   Append to a run's event log",
       "  bun mechanics run show --run=<id>               Phases, criteria, evidence",
       "  bun mechanics run rebuild --run=<id> | --all    Regenerate state.json from events",
+      "  bun mechanics run proposals --run=<id>          What is queued for review",
+      "  bun mechanics run accept --run=<id> --proposal=<id> [--apply]   (human only)",
+      "  bun mechanics run reject --run=<id> --proposal=<id> --reason=…",
     ].join("\n")
   );
 }

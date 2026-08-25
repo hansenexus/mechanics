@@ -327,3 +327,70 @@ describe("applyAutoFix", () => {
     expect(await fs.readFile(file, "utf8")).toBe(before);
   });
 });
+
+describe("narrow-ignore preserves coverage exactly", () => {
+  it("leaves the manifest byte-identical, which is the whole safety argument", async () => {
+    // The op is only defensible because it freezes today's behaviour rather
+    // than guessing what the glob was MEANT to excuse. That claim is checkable:
+    // build the manifest before and after and require the coverage block to be
+    // unchanged. If it ever differs, the op stopped being mechanical.
+    const root = await tmpRepo();
+    await write(
+      root,
+      "mechanics/_config.yaml",
+      [
+        "testGlobs: []",
+        "e2eRunner: bun-script",
+        "coverage:",
+        "  enforce: warn",
+        "  ignore:",
+        "    worker:",
+        "      # debug helpers, not surfaces",
+        '      - "src/workers/_*.ts"',
+        "",
+      ].join("\n")
+    );
+    await fs.writeFile(
+      path.join(root, "mechanics.config.yaml"),
+      [
+        "apps:",
+        "  - slug: demo",
+        "    dir: .",
+        "    adapters: []",
+        "    surfaces:",
+        "      - kind: worker",
+        '        globs: ["src/workers/*.ts"]',
+        "manifestsDir: .mechanics/manifests",
+        "",
+      ].join("\n"),
+      "utf8"
+    );
+    await write(root, "src/workers/_debug.ts", "export {};\n");
+    await write(root, "src/workers/_scratch.ts", "export {};\n");
+    await write(root, "src/workers/sweep.ts", "export {};\n");
+    clearLayoutCache();
+
+    const { buildManifest } = await import("./manifest");
+    const before = (await buildManifest("demo", root)).manifest.coverage;
+
+    const op: AutoOp = {
+      kind: "narrow-ignore",
+      file: "mechanics/_config.yaml",
+      surfaceKind: "worker",
+      glob: "src/workers/_*.ts",
+      literals: ["src/workers/_debug.ts", "src/workers/_scratch.ts"],
+    };
+    const res = await applyAutoFix({ app: "demo", ops: [op], deferred: [] }, root);
+    expect(res.revertedBecause).toBeUndefined();
+    clearLayoutCache();
+
+    const after = (await buildManifest("demo", root)).manifest.coverage;
+    expect(JSON.stringify(after)).toBe(JSON.stringify(before));
+
+    // And the comment above it survived, because the edit is one line, not a
+    // YAML round-trip.
+    const cfg = await fs.readFile(path.join(root, "mechanics/_config.yaml"), "utf8");
+    expect(cfg).toContain("# debug helpers, not surfaces");
+    expect(cfg).not.toContain("_*.ts");
+  });
+});
