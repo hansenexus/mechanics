@@ -43,7 +43,14 @@ const SESSION = "mechanics-shots";
  */
 function cli(args) {
   const cmd = ["bun", CLI, ...args].map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ");
-  const res = spawnSync("sh", ["-c", `${cmd} 2>&1`], { cwd: EXAMPLE, encoding: "utf8" });
+  const res = spawnSync("sh", ["-c", `${cmd} 2>&1`], {
+    cwd: EXAMPLE,
+    encoding: "utf8",
+    // The CLI suppresses colour when stdout is not a TTY, which this is not.
+    // Asking for it back means the cards show the terminal's real palette
+    // rather than a second guess at which words deserve which colour.
+    env: { ...process.env, FORCE_COLOR: "1" },
+  });
   if (res.error) throw res.error;
   return (res.stdout ?? "").replace(/^\n+/, "").replace(/\n+$/, "");
 }
@@ -72,26 +79,40 @@ function ab(args) {
 const escapeHtml = (s) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/** SGR code → class. Only the codes the CLI actually emits. */
+const SGR = { 1: "b", 2: "dim", 31: "bad", 32: "ok", 33: "warn" };
+
 /**
- * Colour the captured text the way the terminal does, by matching on the
- * CLI's own markers rather than by re-deciding what each line means.
+ * Convert the captured ANSI into spans.
+ *
+ * This used to guess — regexes over the plain text deciding which lines looked
+ * like warnings. It drifted the moment the CLI's output changed shape: a line
+ * containing "3 fail" was painted red end to end, bars were left grey, and the
+ * screenshots stopped matching the terminal. Reading the escapes the CLI
+ * already emits means the card cannot disagree with the tool.
  */
-function colourize(line) {
-  const out = escapeHtml(line);
-  if (/^\[mechanics\] (warn|✗)/.test(line) || /^\s+unclaimed /.test(line)) {
-    return `<span class="${line.includes("✗") ? "bad" : "warn"}">${out}</span>`;
+function ansiToHtml(text) {
+  let out = "";
+  let open = 0;
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: parsing SGR escapes is the point
+  const re = /\u001b\[(\d+)m/g;
+  let last = 0;
+  let m = re.exec(text);
+  while (m !== null) {
+    out += escapeHtml(text.slice(last, m.index));
+    const code = Number(m[1]);
+    if (code === 0) {
+      out += "</span>".repeat(open);
+      open = 0;
+    } else if (SGR[code]) {
+      out += `<span class="${SGR[code]}">`;
+      open += 1;
+    }
+    last = m.index + m[0].length;
+    m = re.exec(text);
   }
-  if (line.includes("✓")) return `<span class="ok">${out}</span>`;
-  if (/\bfail\b|\bstale\b|drift/.test(line)) return `<span class="bad">${out}</span>`;
-  return (
-    out
-      .replace(/(\d+)\/(\d+)/g, '<span class="num">$1/$2</span>')
-      // Only a non-zero gap is a warning. Painting `0 unclaimed` amber would
-      // make a fully covered kind look like a problem, which is the exact
-      // misreading the colour is there to prevent.
-      .replace(/\b([1-9]\d*) unclaimed/g, '<span class="warn">$1 unclaimed</span>')
-      .replace(/\b0 unclaimed/g, '<span class="muted">0 unclaimed</span>')
-  );
+  out += escapeHtml(text.slice(last));
+  return out + "</span>".repeat(open);
 }
 
 /** One terminal card: a prompt line, then the captured output. */
@@ -101,7 +122,7 @@ function terminalPage(cards) {
       (c) => `<section class="card">
   <div class="chrome"><i></i><i></i><i></i><span>${escapeHtml(c.caption)}</span></div>
   <pre><span class="prompt">$</span> <span class="cmd">${escapeHtml(c.command)}</span>
-${c.output.split("\n").map(colourize).join("\n")}</pre>
+${ansiToHtml(c.output)}</pre>
 </section>`
     )
     .join("\n");
@@ -144,8 +165,8 @@ ${c.output.split("\n").map(colourize).join("\n")}</pre>
   .ok { color: var(--ok); }
   .warn { color: var(--warn); }
   .bad { color: var(--bad); }
-  .num { color: var(--accent); }
-  .muted { color: var(--muted); }
+  .b { font-weight: 650; color: var(--fg); }
+  .dim { color: var(--muted); opacity: .65; }
 </style>
 ${blocks}
 `;

@@ -105,7 +105,13 @@ describe("renderReport", () => {
       OPTIONS
     );
     expect(html).toContain('class="bar empty"');
-    expect(html).not.toContain('style="width:100%"');
+    // Scoped to the empty bar itself rather than to the whole document. The
+    // summary band added a "behaviours with a linked test" meter, and 1/1 there
+    // is legitimately 100% — a document-wide search for that width would fail
+    // on a correct page and hide the thing this test is actually about, which
+    // is that a 0/0 surface renders no fill at all.
+    const emptyBar = html.slice(html.indexOf('<span class="bar empty"'));
+    expect(emptyBar.slice(0, emptyBar.indexOf("</span>"))).not.toContain("<i");
   });
 
   it("breaks out which mechanics are failing, not just the count", () => {

@@ -90,10 +90,15 @@ describe("template", () => {
   it("reports coverage per declared kind, honouring the ignore glob", async () => {
     const { code, stdout } = await mechanics(["coverage", "--app=example"]);
     expect(code).toBe(0);
-    // 4 commands, 3 claimed, `_debug.ts` excused by the ignore glob.
-    expect(stdout).toMatch(/cli-command\s+3\/4\s+claimed, 1 ignored, 0 unclaimed/);
-    expect(stdout).toMatch(/scheduled-job\s+1\/1\s+claimed, 0 ignored, 0 unclaimed/);
-    expect(stdout).toContain("wave 2026-01-baseline");
+    // 4 commands, 3 claimed, `_debug.ts` excused by the ignore glob — so the
+    // kind is fully COVERED at 100% while the ratio still reads 3/4. Those two
+    // disagreeing is the point: the ratio counts claims, the bar counts claims
+    // plus the surfaces an ignore glob has excused.
+    expect(stdout).toMatch(/cli-command\s+3\/4\s+[━─]+\s+100%\s+1 ignored/);
+    expect(stdout).toMatch(/scheduled-job\s+1\/1\s+[━─]+\s+100%/);
+    // No gap lines: every unignored surface is claimed.
+    expect(stdout).not.toContain("⚠");
+    expect(stdout).toContain("2026-01-baseline");
   });
 
   it("drops the app prefix from every path in a single-app repo", async () => {
