@@ -73,9 +73,14 @@
     "./proposals": "./proposals.ts",
     "./scan": "./scan.ts",
     "./scaffold": "./scaffold.ts",
-    "./init": "./init.ts"
+    "./init": "./init.ts",
+    "./agents": "./agents.ts",
+    "./autofix": "./autofix.ts",
+    "./tui": "./tui.ts",
+    "./prompts": "./prompts.ts"
   },
   "dependencies": {
+    "@clack/prompts": "^1.7.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "gray-matter": "^4.0.3",
     "yaml": "^2.8.4",

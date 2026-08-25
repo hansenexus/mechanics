@@ -85,6 +85,19 @@ byte is restored.
   accepting asserts the suggestion was right, which is the same act as marking
   work green. `mechanics run accept` refuses any actor that is not human.
 
+## Handing the rest to an agent
+
+A `propose`-lane gap needs judgment, which is what a model is for:
+
+```
+mechanics agents                              # what is reachable here
+mechanics gaps --app=$1 --agent=<name>        # let it close them
+```
+
+It has full reach over the tree — mechanics, specs, app code. Four moves stay
+refused whatever the provider: wave files, promoting a draft, touching
+`coverage.ignore`, flipping the ratchet. Verification is still yours.
+
 ## Proposing the rest
 
 Gaps in the `ask` lane go to a person, on a docket run:

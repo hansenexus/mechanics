@@ -67,6 +67,9 @@ type Args = {
   propose: boolean;
   run?: string;
   scanRoots: string[];
+  interactive: boolean;
+  agent?: string;
+  model?: string;
   adopt?: string;
   depth?: number;
   yes: boolean;
@@ -154,6 +157,21 @@ async function main() {
     case "scan":
       await runScan(args);
       break;
+    case "agents":
+      await runAgents(args);
+      break;
+    case "tui": {
+      // Lazy: the dashboard pulls in watchers and every engine at once, and a
+      // one-shot `mechanics check` should not pay for that.
+      const { runTui } = await import("./tui-run");
+      const pkg = await import("./package.json", { with: { type: "json" } }).catch(() => null);
+      await runTui({
+        repoRoot: REPO_ROOT,
+        version: (pkg as { default?: { version?: string } } | null)?.default?.version ?? "0.0.0",
+        checkUpdates: !args.check,
+      });
+      break;
+    }
     case "impact":
       await runImpact(args);
       break;
@@ -570,6 +588,41 @@ async function runVerify(args: Args) {
 }
 
 // ---------------------------------------------------------------------------
+// agents
+// ---------------------------------------------------------------------------
+
+/**
+ * Which providers are actually reachable from this machine.
+ *
+ * Probing costs one spawn and one HTTP GET per provider and saves the worst
+ * failure mode there is: a pipeline that appears to hang because it was
+ * pointed at an endpoint nobody started.
+ */
+async function runAgents(_args: Args) {
+  const { probeAll, pickDefaultProvider } = await import("./agents");
+  const all = await probeAll();
+  const width = Math.max(...all.map((a) => a.name.length));
+  for (const a of all) {
+    const mark = a.available ? green("ready") : dim("unavailable");
+    console.log(
+      `  ${a.name.padEnd(width)}  ${dim(a.kind.padEnd(7))} ${mark.padEnd(20)} ${a.detail}`
+    );
+    if (a.models?.length) {
+      const shown = a.models.slice(0, 4).join(", ");
+      const more = a.models.length > 4 ? ` (+${a.models.length - 4})` : "";
+      console.log(`  ${" ".repeat(width)}  ${dim(`models: ${shown}${more}`)}`);
+    }
+  }
+  console.log("");
+  const def = await pickDefaultProvider();
+  console.log(
+    def
+      ? `  default: ${def.name} — harnesses are preferred, they can edit a tree unaided`
+      : `  ${yellow("no provider is reachable")} — install a harness, or start Ollama / LM Studio`
+  );
+}
+
+// ---------------------------------------------------------------------------
 // scan
 // ---------------------------------------------------------------------------
 
@@ -577,6 +630,45 @@ async function runScan(args: Args) {
   const { scan, resolveRoots, adopt } = await import("./scan");
   const roots = resolveRoots(args.scanRoots, process.cwd());
   const result = await scan({ roots, depth: args.depth });
+
+  // A picker, not a shortcut: `--adopt=<name>` still works and `--yes` is
+  // still required to write. This only saves you reading the table and
+  // retyping a name you can already see.
+  if (args.interactive && !args.adopt) {
+    const { isInteractive, intro, select, confirm, outro } = await import("./prompts");
+    if (!isInteractive()) {
+      console.error("[mechanics] scan --interactive needs a terminal. Use --adopt=<repo> --yes.");
+      process.exit(1);
+    }
+    const candidates = result.repos.filter((r) => !r.onboarded && r.primaryPresent);
+    if (candidates.length === 0) {
+      console.log("  every repo here is already onboarded");
+      return;
+    }
+    intro(`${result.repos.length} repo(s), ${candidates.length} not onboarded`);
+    args.adopt = await select(
+      "Which repo should mechanics adopt?",
+      candidates.map((r) => ({
+        value: r.name,
+        label: r.name,
+        hint:
+          (r.detection.adapters.join(", ") || "no built-in adapter — will need surfaces") +
+          (r.apps ? ` · ${r.apps.slugs.length} app(s)` : ""),
+      }))
+    );
+    const chosen = candidates.find((r) => r.name === args.adopt);
+    if (chosen?.apps && chosen.apps.slugs.length > 0 && !args.app) {
+      args.app = await select(
+        "Which app inside it?",
+        chosen.apps.slugs.map((slug) => ({ value: slug, label: slug }))
+      );
+    }
+    args.yes = await confirm(`Write the mechanics scaffolding into ${args.adopt}?`, false);
+    // Declining still falls through to the dry run below, which prints the
+    // plan and the `--yes` command. Saying "nothing written" here as well
+    // would announce the outcome before showing what was declined.
+    if (!args.yes) outro(`showing what ${args.adopt} would get — nothing will be written`);
+  }
 
   if (args.adopt) {
     // Adopt's refusals name a specific next step (the primary checkout to use,
@@ -694,6 +786,79 @@ async function runGaps(args: Args) {
     for (const f of res.written)
       console.log(`  ${green(args.dryRun ? "would fix" : "fixed")} ${f}`);
     for (const d of plan.deferred) console.log(`  ${dim(`deferred ${d.gap.key}: ${d.reason}`)}`);
+  }
+
+  if (args.agent === "?") {
+    // `--agent=?` means "ask me". Spelled as a value rather than a separate
+    // flag so the interactive and scripted forms are the same argument.
+    const { isInteractive, select } = await import("./prompts");
+    const { probeAll } = await import("./agents");
+    if (!isInteractive()) {
+      console.error("[mechanics] --agent=? needs a terminal. Name one: --agent=claude");
+      process.exit(1);
+    }
+    const ready = (await probeAll()).filter((a) => a.available);
+    if (ready.length === 0) {
+      console.error("[mechanics] no agent provider is reachable — see `mechanics agents`");
+      process.exit(1);
+    }
+    args.agent = await select(
+      "Which agent should close the remaining gaps?",
+      ready.map((a) => ({
+        value: a.name,
+        label: a.name,
+        hint:
+          a.kind === "harness"
+            ? "edits the tree itself"
+            : `${a.models?.[0] ?? "model"} · structured edits`,
+      }))
+    );
+  }
+
+  if (args.agent) {
+    const { resolveProvider, probeProvider } = await import("./agents");
+    const { agentFixGap } = await import("./autofix");
+    const spec = resolveProvider(args.agent, { model: args.model });
+    const probe = await probeProvider(spec);
+    if (!probe.available) {
+      console.error(`[mechanics] ${args.agent}: ${probe.detail}`);
+      process.exit(1);
+    }
+    const slug = slugs[0] as string;
+    // Verification after every gap, not once at the end: a batch that breaks
+    // on gap 3 and is only noticed at gap 12 has nine changes of unknown
+    // provenance mixed into the revert.
+    const verify = async () => {
+      const { buildManifest } = await import("./manifest");
+      const { errors } = await buildManifest(slug, REPO_ROOT);
+      return errors[0] ?? null;
+    };
+    console.log("");
+    for (const gap of propose) {
+      const res = await agentFixGap(gap, {
+        repoRoot: REPO_ROOT,
+        app: slug,
+        spec,
+        verify,
+        dryRun: args.dryRun,
+      });
+      const mark = {
+        changed: green("changed"),
+        declined: dim("declined"),
+        unusable: yellow("unusable"),
+        reverted: red("reverted"),
+      }[res.outcome];
+      console.log(`  ${mark} ${gap.title}`);
+      console.log(`        ${dim(res.summary)}`);
+      for (const f of res.written) console.log(`        ${green("+")} ${f}`);
+      for (const r of res.refused)
+        console.log(`        ${yellow("skipped")} ${r.path}: ${r.reason}`);
+      if (res.revertedBecause) console.log(`        ${red(res.revertedBecause)}`);
+    }
+    console.log("");
+    console.log(
+      `  ${dim("nothing was verified — a verdict is a human's, and so is accepting any of this")}`
+    );
   }
 
   if (args.propose) {
@@ -884,6 +1049,7 @@ function parseArgs(argv: string[]): Args {
     json: false,
     propose: false,
     scanRoots: [],
+    interactive: false,
     yes: false,
     resume: false,
     dryRun: false,
@@ -906,6 +1072,9 @@ function parseArgs(argv: string[]): Args {
     else if (a.startsWith("--adopt=")) out.adopt = a.slice(8);
     else if (a.startsWith("--depth=")) out.depth = Number(a.slice(8));
     else if (a === "--yes") out.yes = true;
+    else if (a === "--interactive" || a === "-i") out.interactive = true;
+    else if (a.startsWith("--agent=")) out.agent = a.slice(8);
+    else if (a.startsWith("--model=")) out.model = a.slice(8);
     else if (a === "--check") out.check = true;
     else if (a === "--resume") out.resume = true;
     else if (a === "--dry-run") out.dryRun = true;
@@ -956,11 +1125,15 @@ function usage() {
       "  bun mechanics gaps --app=<s> --propose --run=<id>  Queue the rest for a human",
       "  bun mechanics scan [--root=<dir>] [--depth=N] [--json]   Repos here, and their stacks",
       "  bun mechanics scan --adopt=<repo> [--app=<slug>] [--yes]  Onboard one of them",
+      "  bun mechanics scan --interactive                Pick one from a list and adopt it",
+      "  bun mechanics agents                            Which agent providers are reachable",
+      "  bun mechanics gaps --app=<s> --agent=<name> [--model=<m>]  Let one close the rest",
       "  bun mechanics impact --app=<slug> --base=<ref>  Changed files → claiming mechanics",
       "  bun mechanics screens --app=<s> --wave=<w> --checkpoint=<before|after|...>",
       "                [--routes=/a,/b] [--base-url=u] [--viewport=WxH] [--suffix=mobile]",
       "                [--keep-png] [--dry-run]         Capture per-route screenshots",
       "  bun mechanics mcp                               Serve the corpus to an agent (stdio)",
+      "  bun mechanics tui                               Leave it open: drift, gaps, runs, updates",
       "",
       "  bun mechanics run list [--watch]                Board: runs in flight (docket/1)",
       '  bun mechanics run new --title="…"               Open a work order',

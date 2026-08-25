@@ -121,6 +121,9 @@ export async function runDocketCli(argv: string[]): Promise<void> {
     case "attach":
       await cmdAttach(flags);
       break;
+    case "review":
+      await cmdReview(flags);
+      break;
     case "proposals":
       await cmdProposals(flags);
       break;
@@ -230,7 +233,11 @@ async function cmdDispatch(flags: Flags): Promise<void> {
 
   // Resolved before planning: the worktree path is part of the plan, and a dry
   // run that prints a different command than it would execute is a small lie.
-  const deps = await buildDispatchDeps(flags.pr === true);
+  const deps = await buildDispatchDeps(
+    flags.pr === true,
+    flag(flags, "agent"),
+    flag(flags, "model")
+  );
   const primaryRoot = await findPrimaryRoot(deps.run, REPO_ROOT);
 
   const plan = planDispatch({
@@ -248,7 +255,9 @@ async function cmdDispatch(flags: Flags): Promise<void> {
     ...(issue !== undefined ? { issue } : {}),
     withPush: flags.push === true,
     withPr: flags.pr === true,
-    withAgent: flags.agent === true,
+    // `--agent` launches whatever harness is installed; `--agent=<name>`
+    // picks one. Both mean "launch an agent", so presence is what counts.
+    withAgent: flags.agent !== undefined,
   });
 
   console.log(describePlan(plan));
@@ -294,7 +303,7 @@ async function cmdDispatch(flags: Flags): Promise<void> {
   }
 }
 
-async function buildDispatchDeps(needsForge: boolean) {
+async function buildDispatchDeps(needsForge: boolean, agentName?: string, agentModel?: string) {
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
   const exec = promisify(execFile);
@@ -317,24 +326,43 @@ async function buildDispatchDeps(needsForge: boolean) {
     forge,
     actorIdentity: process.env.USER,
     launchAgent: async ({ worktree, prompt }: { worktree: string; prompt: string }) => {
-      const { spawn } = await import("node:child_process");
-      try {
-        await exec("which", ["claude"]);
-      } catch {
+      // Which harness runs the work is a machine fact, not a repo one. The
+      // default is whatever is actually installed rather than a hardcoded
+      // `claude`, so a box with a different CLI is not a box where dispatch
+      // silently does not work.
+      const { probeProvider, resolveProvider, runProvider } = await import("./agents");
+      const name = agentName ?? (await firstAvailableHarness());
+      if (!name) {
         throw new Error(
-          "docket: `claude` is not on PATH — drop --agent and start a session yourself"
+          "docket: no agent harness on PATH (tried claude, codex, qwen) — " +
+            "drop --agent and start a session yourself, or pass --agent=<name>"
         );
       }
-      // Detached: the agent outlives this command, which is the point of
-      // dispatching rather than running the work inline.
-      const child = spawn("claude", ["-p", prompt], {
-        cwd: worktree,
-        detached: true,
-        stdio: "ignore",
-      });
-      child.unref();
+      const spec = resolveProvider(name, { model: agentModel });
+      if (spec.kind !== "harness") {
+        throw new Error(
+          `docket: "${name}" is a model provider, not a harness — it cannot drive a worktree ` +
+            "on its own. Use `mechanics fix --agent=" +
+            name +
+            "` for the structured-edit loop instead."
+        );
+      }
+      const probe = await probeProvider(spec);
+      if (!probe.available) throw new Error(`docket: ${probe.detail}`);
+      await runProvider(spec, prompt, { cwd: worktree, detach: true });
+      return;
     },
   };
+}
+
+/** First harness actually installed, in declared order. */
+async function firstAvailableHarness(): Promise<string | null> {
+  const { BUILTIN_PROVIDERS, probeProvider } = await import("./agents");
+  for (const spec of Object.values(BUILTIN_PROVIDERS)) {
+    if (spec.kind !== "harness") continue;
+    if ((await probeProvider(spec)).available) return spec.name;
+  }
+  return null;
 }
 
 async function makeForge(run: (c: string, a: string[]) => Promise<string>, remoteName: string) {
@@ -400,6 +428,95 @@ async function cmdProposals(flags: Flags): Promise<void> {
     console.log(`      ${r.title}`);
     console.log(`      ${r.suggestion}${r.op ? `  [applies: ${r.op.kind}]` : ""}`);
   }
+}
+
+/**
+ * Walk the open proposals one at a time and decide each.
+ *
+ * The reason this is a walkthrough and not a multi-select: accepting twelve
+ * proposals is twelve judgments, and an interface that makes it one keystroke
+ * is an interface that encourages waving them through. The cost of the
+ * interaction should match the cost of the decision.
+ */
+async function cmdReview(flags: Flags): Promise<void> {
+  const runId = flag(flags, "run") ?? fail("run review: --run is required");
+  const { isInteractive, intro, outro, note, reviewEach, text } = await import("./prompts");
+  if (!isInteractive()) {
+    fail(
+      "run review needs a terminal. Without one, use `run proposals` to read them and " +
+        "`run accept` / `run reject` to decide — every prompt has a flag."
+    );
+  }
+
+  const actor = currentActor(flags);
+  if (actor.kind !== "human") {
+    fail(
+      `run review: only a human may accept a proposal — you are "${actor.kind}". ` +
+        "Reviewing is deciding, and that is the one thing an agent may not do here."
+    );
+  }
+
+  const { listProposals, acceptProposal, rejectProposal } = await import("./proposals");
+  const statuses = await proposalStatuses(runId);
+  const open = (await listProposals(REPO_ROOT, runId)).filter(
+    (r) => (statuses.get(r.proposal) ?? "open") === "open"
+  );
+  if (open.length === 0) {
+    console.log(`[docket] ${runId}: nothing open to review`);
+    return;
+  }
+
+  intro(`${runId} — ${open.length} proposal(s) open`);
+  const decisions = await reviewEach(
+    open,
+    (r) => ({
+      title: r.title,
+      body: [
+        r.detail,
+        "",
+        `Suggested: ${r.suggestion}`,
+        r.op ? `Applies:   ${r.op.kind} → ${r.op.file}` : "Applies:   nothing mechanical",
+        `Raised by: ${r.raisedBy}`,
+      ].join("\n"),
+    }),
+    [
+      { value: "accept", label: "Accept", hint: "and apply the edit if it carries one" },
+      { value: "accept-only", label: "Accept without applying", hint: "record the decision" },
+      { value: "reject", label: "Reject", hint: "asks for a reason" },
+    ]
+  );
+
+  let accepted = 0;
+  let rejected = 0;
+  for (const { item, choice } of decisions) {
+    if (choice === "reject") {
+      // A reason is required by `rejectProposal` anyway; asking here means the
+      // requirement surfaces as a prompt rather than as an error afterwards.
+      const reason = await text(`Why reject "${item.proposal}"?`, {
+        placeholder: "not a real surface / handled elsewhere",
+        validate: (v) => (v.trim() ? undefined : "A reason is required — silence is not an answer"),
+      });
+      await rejectProposal(REPO_ROOT, runId, item.proposal, reason, actor);
+      rejected++;
+      continue;
+    }
+    const res = await acceptProposal(REPO_ROOT, runId, item.proposal, actor, {
+      apply: choice === "accept",
+    });
+    accepted++;
+    if (res.revertedBecause) {
+      note(res.revertedBecause, `reverted: ${item.proposal}`);
+    } else if (res.written.length) {
+      note(res.written.join("\n"), `wrote: ${item.proposal}`);
+    }
+  }
+
+  const left = open.length - accepted - rejected;
+  outro(
+    `${accepted} accepted, ${rejected} rejected` +
+      (left > 0 ? `, ${left} still open` : "") +
+      " — nothing here recorded a verification verdict"
+  );
 }
 
 async function cmdAccept(flags: Flags): Promise<void> {
