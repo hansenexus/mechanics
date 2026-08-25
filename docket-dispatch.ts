@@ -228,8 +228,14 @@ export function agentPrompt(plan: DispatchPlan): string {
     "      --criterion=<id> --verdict=pass --method=e2e --evidence=<path>",
     `  bun mechanics run event --run=${plan.runId} --type=gate.blocked --reason="…" --needs=human`,
     "",
+    "If you find something worth changing that is not yours to decide, propose it",
+    "rather than doing it or dropping it:",
+    `  bun mechanics gaps --app=<slug> --propose --run=${plan.runId}`,
+    "",
     "A pass verdict requires evidence. If you are blocked, say so with gate.blocked",
     "rather than going quiet — a silent run is indistinguishable from a dead one.",
+    "You may raise and reject proposals; you may not accept your own. The CLI",
+    "refuses it, and that refusal is the point rather than an obstacle.",
   ].join("\n");
 }
 

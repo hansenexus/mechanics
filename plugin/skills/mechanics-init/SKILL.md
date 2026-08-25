@@ -35,7 +35,9 @@ the shape before writing any.
    directory — never hardcode either shape.
 2. You are not on the default branch. The corpus lands through pull requests.
 3. Where the app has routes, run `mechanics scaffold --app=$1` for
-   route-derived draft stubs.
+   route-derived draft stubs. Its output is schema-valid, so `check` is green
+   immediately after scaffolding — a red check here means something you did,
+   not something it did.
 4. Build the **scope table**: from the app's own docs, routes and data model,
    define the areas (kebab-case dirs), each with its surfaces, source hints, an
    expected count band, and an explicit NOT_YOURS list of surfaces owned by
