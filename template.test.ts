@@ -241,4 +241,103 @@ describe("template over MCP", () => {
     expect(unknownKind.isError).toBe(true);
     expect(unknownKind.text).toContain("cli-command, scheduled-job");
   });
+
+  // The only place a decision record is retrieved through a real MCP client
+  // against a real repo root. `decisions.test.ts` proves the rules; this
+  // proves an agent asking "why is this like this" about a file it is holding
+  // gets the answer back, which is the entire delivery channel.
+  it("retrieves a decision by the file an agent is about to touch", async () => {
+    await writeDecisionRecord(repo, "2026-01-snapshot-format", ["src/commands/backup.ts"]);
+    try {
+      const byPath = await call("mechanics_decisions", { path: "src/commands/backup.ts" });
+      const hit = JSON.parse(byPath.text) as {
+        count: number;
+        decisions: Array<{ id: string; headline: string; sections: Record<string, string> }>;
+      };
+      expect(hit.count).toBe(1);
+      expect(hit.decisions[0]?.id).toBe("2026-01-snapshot-format");
+      expect(hit.decisions[0]?.headline).toBe("Write snapshots as tar.zst.");
+      expect(Object.keys(hit.decisions[0]?.sections ?? {})).toEqual([
+        "Context",
+        "Decision",
+        "Rationale",
+        "Consequences",
+      ]);
+
+      const miss = await call("mechanics_decisions", { path: "src/jobs/prune-snapshots.ts" });
+      expect((JSON.parse(miss.text) as { count: number; total: number }).count).toBe(0);
+      expect((JSON.parse(miss.text) as { total: number }).total).toBe(1);
+    } finally {
+      await fs.rm(path.join(repo, ".docket"), { recursive: true, force: true });
+    }
+  });
+});
+
+/**
+ * A decision record with `affects.paths` pointing wherever the caller says.
+ * Written as raw text rather than through `writeDecision` on purpose: this
+ * suite's whole job is to exercise the shipped artefacts from outside, and a
+ * hand-authored file is what a user actually commits.
+ */
+async function writeDecisionRecord(root: string, id: string, paths: string[]): Promise<void> {
+  const dir = path.join(root, ".docket", "decisions");
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(
+    path.join(dir, `${id}.md`),
+    [
+      "---",
+      "status: accepted",
+      "date: 2026-01-05",
+      "decidedBy: [alex]",
+      "affects:",
+      "  specs: [example.backups.create-snapshot]",
+      `  paths: [${paths.map((p) => JSON.stringify(p)).join(", ")}]`,
+      "---",
+      "",
+      "## Context",
+      "",
+      "Snapshot format was never written down.",
+      "",
+      "## Decision",
+      "",
+      "Write snapshots as tar.zst.",
+      "",
+      "## Rationale",
+      "",
+      "gzip was rejected: restore time dominated the window.",
+      "",
+      "## Consequences",
+      "",
+      "zstd is now a hard runtime dependency.",
+      "",
+    ].join("\n"),
+    "utf8"
+  );
+}
+
+/**
+ * The staleness gate, run through the real CLI. This is the rule that stops
+ * the decision folder from rotting, and it only counts if `mechanics check`
+ * actually exits non-zero on it.
+ */
+describe("template decision records", () => {
+  afterAll(async () => {
+    await fs.rm(path.join(repo, ".docket"), { recursive: true, force: true });
+  });
+
+  it("passes check when the paths still resolve", async () => {
+    await writeDecisionRecord(repo, "2026-01-snapshot-format", ["src/commands/*.ts"]);
+    const { code, stdout, stderr } = await mechanics(["check", "--app=example"]);
+    expect(`${stdout}${stderr}`).toContain("decisions: 1 record(s) ok");
+    expect(code).toBe(0);
+  });
+
+  it("fails check when an accepted record points at deleted code", async () => {
+    await writeDecisionRecord(repo, "2026-01-snapshot-format", ["src/deleted/**"]);
+    const { code, stdout, stderr } = await mechanics(["check", "--app=example"]);
+    const out = `${stdout}${stderr}`;
+    expect(out).toContain("matches no files");
+    expect(out).toContain("supersede it or reject it");
+    expect(code).toBe(1);
+  });
 });

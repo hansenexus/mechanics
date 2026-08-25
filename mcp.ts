@@ -7,8 +7,8 @@
  * The corpus is only worth writing if the agents doing the work can read it
  * mid-task. Grepping markdown gets an agent the prose and none of the
  * structure: not which criteria exist, not whether a route is claimed, not
- * which mechanics a diff touches. These five tools answer exactly the questions
- * that come up while changing an app.
+ * which mechanics a diff touches, not why a thing is the way it is. These six
+ * tools answer exactly the questions that come up while changing an app.
  *
  * **Everything reads the committed manifest, never a rebuild.** A rebuild walks
  * the whole app tree — a second or more on a big app — and an agent asking "what
@@ -21,12 +21,18 @@
  * without one is precisely the failure the wave format exists to prevent.
  * Verdicts go through `mechanics verify` or the docket CLI, where the evidence
  * requirement is enforced.
+ *
+ * `mechanics_decisions` reads decision records and writes none, for the same
+ * reason. A decision is an argument a human signs; a tool that let a model
+ * author one would hand it a way to legislate its own constraints away, which
+ * is the refusal above wearing a different hat.
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { REPO_ROOT } from "./fsutil";
+import { findDecisionConflicts, listDecisions, openRunIds, selectDecisions } from "./decisions";
+import { listFilesRecursive, REPO_ROOT } from "./fsutil";
 import { mapImpact } from "./impact";
 import { appPath } from "./layout";
 import { loadManifest, loadMechanicDoc, onboardedApps } from "./manifest";
@@ -263,6 +269,67 @@ export function createMechanicsMcpServer(): McpServer {
 
       const result = mapImpact(found.manifest, appPath(app, REPO_ROOT), changed);
       return json({ app, ...result });
+    }
+  );
+
+  server.registerTool(
+    "mechanics_decisions",
+    {
+      title: "Why is this like this",
+      description:
+        "Decision records (ADRs) that apply to what you are about to touch. Filter by `path` " +
+        "(a file you are about to edit), `spec` (a mechanic id), or `query` (free text); with " +
+        "no filter you get every live record. Read this BEFORE undoing something that looks " +
+        "wrong — it is usually load bearing. Superseded and rejected records are hidden unless " +
+        "asked for. Flags decisions from two open runs about the same subsystem.",
+      inputSchema: {
+        path: z
+          .string()
+          .optional()
+          .describe("Repo-relative file; matched against each record's affects.paths globs"),
+        spec: z
+          .string()
+          .optional()
+          .describe("Mechanic/spec id; matches that id and anything above or below it"),
+        query: z.string().optional().describe("Free text over the id, headline and body"),
+        includeSuperseded: z
+          .boolean()
+          .optional()
+          .describe("Include superseded and rejected records — the history, not the guidance"),
+      },
+    },
+    async ({ path, spec, query, includeSuperseded }) => {
+      const { decisions, errors } = await listDecisions(REPO_ROOT);
+      const selected = selectDecisions(decisions, { path, spec, query, includeSuperseded });
+
+      // Only computed when something matched, and only for the runs the caller
+      // is actually being shown: resolving overlap walks the tree and reduces
+      // every run log, which is not a cost to pay for an empty answer.
+      const conflicts = selected.length
+        ? findDecisionConflicts(decisions, {
+            openRuns: await openRunIds(REPO_ROOT),
+            files: await listFilesRecursive(REPO_ROOT),
+          }).filter((c) => selected.some((d) => c.decisions.includes(d.id)))
+        : [];
+
+      return json({
+        count: selected.length,
+        total: decisions.length,
+        ...(errors.length > 0 ? { errors } : {}),
+        ...(conflicts.length > 0 ? { conflicts } : {}),
+        decisions: selected.map((d) => ({
+          id: d.id,
+          headline: d.headline,
+          status: d.status,
+          date: d.date,
+          decidedBy: d.decidedBy,
+          ...(d.run ? { run: d.run } : {}),
+          affects: d.affects,
+          supersedes: d.supersedes,
+          source: d.source,
+          sections: d.sections,
+        })),
+      });
     }
   );
 

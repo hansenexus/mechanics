@@ -5,7 +5,8 @@
  * Commands:
  *   init     [--app=<slug>]            Set a repo up: config, corpus skeleton, CI gate,
  *            [--no-ci|--no-mcp|--no-docket] [--dry-run]   MCP registration, manifest
- *   check    --app=<slug> | --all      Validate corpus + waves + coverage (exit 1 on errors)
+ *   check    --app=<slug> | --all      Validate corpus + waves + coverage + decision records
+ *                                      (exit 1 on errors)
  *   build    --app=<slug> | --all      Regenerate committed manifest(s)
  *   build    ... --check               Drift mode: exit 1 if any manifest is stale
  *   coverage --app=<slug>              Human-readable coverage table + gap list
@@ -26,6 +27,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { inventoryRoutes } from "./coverage";
+import { checkDecisions } from "./decisions";
 import { REPO_ROOT } from "./fsutil";
 import { mapImpact } from "./impact";
 import { appDir, appPath } from "./layout";
@@ -253,7 +255,35 @@ async function runCheck(args: Args) {
       );
     }
   }
+  // Repo-level, so it runs once rather than per app: the decision folder is
+  // one folder for the whole checkout. Deliberately not gated on `--app` —
+  // a stale decision is stale regardless of which app you were checking.
+  if (await reportDecisionFindings()) failed = true;
+
   if (failed) process.exit(1);
+}
+
+/**
+ * The decision-record gate. Errors fail the check for the reason the layer
+ * exists: an `accepted` record whose `affects.paths` matches nothing points at
+ * deleted code, and the next agent has no way to tell it is lying. Conflicts
+ * between two open runs are warnings — concurrency is legitimate and CI must
+ * not punish it. Returns whether anything fatal was found.
+ */
+async function reportDecisionFindings(): Promise<boolean> {
+  const { decisions, errors, warnings } = await checkDecisions(REPO_ROOT);
+  if (decisions.length === 0 && errors.length === 0) return false;
+
+  for (const w of warnings) console.warn(`[mechanics] warn  decisions: ${w}`);
+  for (const e of errors) console.error(`[mechanics] error ${e}`);
+  if (errors.length > 0) {
+    console.error(`[mechanics] ✗ decisions: ${errors.length} error(s)`);
+    return true;
+  }
+  console.log(
+    `[mechanics] ✓ decisions: ${decisions.length} record(s) ok (${warnings.length} warning(s))`
+  );
+  return false;
 }
 
 function collectCoverageFindings(
