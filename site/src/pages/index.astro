@@ -304,6 +304,21 @@ verify: e2e
         good.
       </p>
 
+      <h3>And when two of them disagree</h3>
+      <p class="measure">
+        Decision records live at <code>.docket/decisions/</code> and name what they
+        <code>affect</code> — specs and paths — so a decision is retrievable by the file an agent
+        is about to touch. <em>Why is this like this</em> is unanswerable by search, because the
+        agent would have to already suspect there was a reason.
+      </p>
+      <p class="measure">
+        Two open runs whose decisions overlap get flagged. That is the characteristic multi-agent
+        failure and it is invisible from inside either run, because each one looks locally
+        coherent. A record that points at deleted code fails the build; two agents working the
+        same subsystem is only a warning, because concurrency is legitimate and CI should not
+        punish it.
+      </p>
+
       <TerminalCard caption="Pick a provider, or ask which ones responded" command="mechanics agents">
         <span class="ok">✓</span> claude       harness    <span class="dim">claude-cli 2.1.0</span>
 {"\n"}<span class="ok">✓</span> ollama       model      <span class="dim">3 models · qwen2.5-coder:7b, …</span>

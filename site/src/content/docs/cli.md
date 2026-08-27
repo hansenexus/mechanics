@@ -49,9 +49,15 @@ in a terminal.
 mechanics check --app=<slug> | --all
 ```
 
-Validates the corpus (frontmatter, AC labels, ID shape), resolves waves, and
-reports coverage. Every unclaimed surface is warned about by name and path.
-Exits non-zero when `coverage.enforce` is `error` and gaps remain.
+Validates the corpus (frontmatter, AC labels, ID shape), resolves waves,
+reports coverage, and checks the [decision records](/docket/#decision-records).
+Every unclaimed surface is warned about by name and path. Exits non-zero when
+`coverage.enforce` is `error` and gaps remain, or when a decision record is
+stale.
+
+The decision gate runs once for the repo rather than per app: `.docket/` is
+repo-level, and a stale decision is stale regardless of which app you were
+checking.
 
 ### `build`
 
