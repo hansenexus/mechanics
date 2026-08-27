@@ -3,8 +3,13 @@ import CopyCommand from "../components/CopyCommand.astro";
 import TerminalCard from "../components/TerminalCard.astro";
 import Landing from "../layouts/Landing.astro";
 
+// Read from the package the site documents, so the hero's version line cannot
+// drift from what `npm i` actually installs.
+import pkg from "../../../package.json";
+
 const REPO = "https://github.com/hansenexus/mechanics";
 const NPM = "https://www.npmjs.com/package/@hansenexus/mechanics";
+const VERSION = pkg.version;
 ---
 
 <Landing
@@ -15,56 +20,75 @@ const NPM = "https://www.npmjs.com/package/@hansenexus/mechanics";
     <a class="wordmark" href="/">mechanics</a>
     <nav>
       <a href="/getting-started/">Docs</a>
+      <a href="/report/">Coverage</a>
       <a href={REPO}>GitHub</a>
-      <a href={NPM}>npm</a>
+      <a class="button ghost" href={NPM}>npm ↗</a>
     </nav>
   </header>
 
   <main>
     <!-- 1. Hero -->
     <section class="hero">
-      <h1>did we keep every behaviour?</h1>
-      <p class="lede">
-        Your agent writes the code fast. <strong>mechanics</strong> is the ledger of what the
-        app is supposed to do — and the gate that fails CI when the two drift apart.
-      </p>
+      <div class="hero-copy">
+        <p class="eyebrow">Developer preview · v{VERSION} · MIT</p>
+        <h1>did we keep every behaviour?</h1>
+        <p class="lede">
+          Your agent writes the code fast. <strong>mechanics</strong> is the ledger of what the
+          app is supposed to do — and the gate that fails CI when the two drift apart.
+        </p>
 
-      <CopyCommand command="npm i -D @hansenexus/mechanics" />
+        <div class="hero-cta">
+          <a class="button" href="/getting-started/">Get started</a>
+          <CopyCommand command="npm i -D @hansenexus/mechanics" />
+        </div>
 
-      <p class="hero-links">
-        <a href="/getting-started/">Get started</a>
-        <span class="sep">·</span>
-        <a href={REPO}>Source</a>
-        <span class="sep">·</span>
-        <a href="/report/">See a real report</a>
-      </p>
+        <p class="hero-links">
+          <a href={REPO}>Source</a>
+          <span class="sep">·</span>
+          <a href="/report/">See a real report</a>
+          <span class="sep">·</span>
+          <a href="/docket/">docket/1</a>
+        </p>
 
-      <p class="badges">
-        <a href={NPM}
-          ><img
-            src="https://img.shields.io/npm/v/@hansenexus/mechanics?logo=npm&color=cb3837"
-            alt="npm version"
-            width="104"
-            height="20"
-          /></a
-        >
-        <a href={`${REPO}/actions/workflows/ci.yml`}
-          ><img
-            src={`${REPO}/actions/workflows/ci.yml/badge.svg`}
-            alt="CI status"
-            width="60"
-            height="20"
-          /></a
-        >
-        <a href={`${REPO}/blob/main/LICENSE`}
-          ><img
-            src="https://img.shields.io/npm/l/@hansenexus/mechanics?color=blue"
-            alt="MIT licence"
-            width="80"
-            height="20"
-          /></a
-        >
-      </p>
+        <p class="badges">
+          <a href={NPM}
+            ><img
+              src="https://img.shields.io/npm/v/@hansenexus/mechanics?logo=npm&color=cb3837"
+              alt="npm version"
+              width="104"
+              height="20"
+            /></a
+          >
+          <a href={`${REPO}/actions/workflows/ci.yml`}
+            ><img
+              src={`${REPO}/actions/workflows/ci.yml/badge.svg`}
+              alt="CI status"
+              width="60"
+              height="20"
+            /></a
+          >
+          <a href={`${REPO}/blob/main/LICENSE`}
+            ><img
+              src="https://img.shields.io/npm/l/@hansenexus/mechanics?color=0f7b6c"
+              alt="MIT licence"
+              width="80"
+              height="20"
+            /></a
+          >
+        </p>
+      </div>
+
+      <TerminalCard caption="a session, replayed">
+<span class="prompt">$</span> <span class="cmd">mechanics check --all</span>
+{"\n"}<span class="ok">✓</span> corpus     <span class="dim">25 behaviours parse, ids unique</span>
+{"\n"}<span class="ok">✓</span> waves      <span class="dim">2026-08-redesign consistent</span>
+{"\n"}<span class="warn">⚠</span> coverage   <span class="dim">4 unclaimed — route /, /login …</span>
+{"\n\n"}<span class="prompt">$</span> <span class="cmd">mechanics gaps --agent=claude</span>
+{"\n"}<span class="ok">→</span> fix route /login    <span class="dim">stub drafted in a worktree</span>
+{"\n"}<span class="warn">→</span> 2 proposals raised  <span class="dim">waiting on a human</span>
+{"\n\n"}<span class="prompt">$</span> <span class="cmd">mechanics verify --wave=2026-08-redesign</span>
+{"\n"}<span class="ok">✓</span> 11/17 verified      <span class="dim">evidence recorded per pass</span>
+      </TerminalCard>
     </section>
 
     <!-- 2. The problem -->
@@ -83,7 +107,8 @@ const NPM = "https://www.npmjs.com/package/@hansenexus/mechanics";
     </section>
 
     <!-- 3. The differentiator -->
-    <section>
+    <section class="pillar">
+      <p class="n">01</p>
       <h2>Coverage for what your app does, not what your code runs</h2>
       <p class="measure">
         Line coverage reports which lines executed. mechanics reports which{" "}
@@ -215,7 +240,8 @@ verify: e2e
     </section>
 
     <!-- 5. The drift gate -->
-    <section>
+    <section class="pillar">
+      <p class="n">02</p>
       <h2>The gate is what stops the corpus rotting</h2>
       <p class="measure">
         Documentation decays because nothing checks it. The manifest is committed, so CI can
@@ -240,7 +266,8 @@ verify: e2e
     </section>
 
     <!-- 6. The refusals -->
-    <section>
+    <section class="pillar">
+      <p class="n">03</p>
       <h2>The two things it refuses to do</h2>
       <div class="refusals">
         <div class="refusal">
@@ -342,8 +369,8 @@ verify: e2e
         <img
           src="/images/report.png"
           alt="The HTML coverage report: surface coverage bars, a wave rollup with failures, and all 25 behaviours"
-          width="1180"
-          height="2051"
+          width="1165"
+          height="2360"
           loading="lazy"
           decoding="async"
         />
@@ -385,11 +412,24 @@ verify: e2e
         the <code>.mcp.json</code> registration, and the committed manifest.
         <code>--dry-run</code> shows the plan and writes nothing.
       </p>
-      <p class="hero-links">
-        <a href="/getting-started/">Read the docs</a>
-        <span class="sep">·</span>
-        <a href={REPO}>Star it on GitHub</a>
-      </p>
+      <div class="cta-band">
+        <div>
+          <h2>Onboard in two commands</h2>
+          <p>
+            Then <code>scaffold</code> drafts a stub per unclaimed surface, and the gate holds
+            the line from there.
+          </p>
+          <p class="cta-links">
+            <a href="/getting-started/">Read the docs</a>
+            <span class="sep">·</span>
+            <a href={REPO}>Star it on GitHub</a>
+          </p>
+        </div>
+        <div class="cta-commands">
+          <div><span class="prompt">$</span> npm i -D @hansenexus/mechanics</div>
+          <div><span class="prompt">$</span> npx mechanics init</div>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -406,77 +446,135 @@ verify: e2e
 </Landing>
 
 <style>
+  /*
+   * Slate. The page is a grey canvas; everything that carries evidence — a
+   * table, a code sample, a terminal — is a card sitting on it. That is the
+   * whole system, and it is why `--bg` is darker than `--panel`.
+   */
   .nav {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    max-width: 1000px;
+    max-width: 1180px;
     margin: 0 auto;
-    padding: 1.25rem 1.25rem 0;
+    padding: 1.25rem 2.5rem 0;
   }
 
   .wordmark {
-    font-family: var(--font-mono);
-    font-weight: 650;
-    font-size: 15px;
+    font-weight: 700;
+    font-size: 16px;
     color: var(--fg);
-    text-decoration: none;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
   }
 
   .nav nav {
     display: flex;
-    gap: 1.25rem;
+    align-items: center;
+    gap: 1.6rem;
     font-size: 14px;
   }
 
   .nav nav a {
     color: var(--muted);
-    text-decoration: none;
   }
 
   .nav nav a:hover {
     color: var(--fg);
   }
 
+  /* The one filled control on the page is the one action it wants. Everything
+     else that looks clickable is outlined, so the hierarchy is legible before
+     any of the words are read. */
+  .button {
+    display: inline-block;
+    background: var(--accent);
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 11px 20px;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+  }
+
+  .button:hover {
+    background: var(--accent-hover);
+    color: #ffffff;
+  }
+
+  .button.ghost {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--fg);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 6px 14px;
+  }
+
+  .button.ghost:hover {
+    background: var(--panel);
+    border-color: var(--muted);
+    color: var(--fg);
+  }
+
   main {
-    max-width: 1000px;
+    max-width: 1180px;
     margin: 0 auto;
-    padding: 0 1.25rem 4rem;
+    padding: 0 2.5rem 4rem;
   }
 
   section {
-    margin-top: 5rem;
-  }
-
-  .hero {
     margin-top: 4.5rem;
   }
 
-  h1 {
-    font-size: clamp(2rem, 6vw, 3.25rem);
-    line-height: 1.08;
-    letter-spacing: -0.03em;
+  .hero {
+    display: grid;
+    grid-template-columns: 6fr 6fr;
+    gap: 2.5rem;
+    align-items: center;
+    margin-top: 0;
+    padding: 4rem 0 1rem;
+  }
+
+  /* Grid items default to min-width:auto, so the terminal's widest line would
+     push its track past the container instead of scrolling inside it. */
+  .hero > * {
+    min-width: 0;
+  }
+
+  .eyebrow {
+    font-size: 14px;
+    color: var(--muted);
     margin: 0 0 1rem;
-    font-weight: 660;
+  }
+
+  h1 {
+    font-size: clamp(2.25rem, 4.4vw, 3.25rem);
+    line-height: 1.06;
+    letter-spacing: -0.03em;
+    margin: 0 0 1.1rem;
+    font-weight: 700;
+    color: var(--fg);
+    text-wrap: balance;
   }
 
   h2 {
-    font-size: clamp(1.25rem, 3vw, 1.6rem);
+    font-size: clamp(1.3rem, 2.4vw, 1.5625rem);
     line-height: 1.2;
     letter-spacing: -0.02em;
     margin: 0 0 0.9rem;
-    font-weight: 640;
+    font-weight: 700;
+    color: var(--fg);
   }
 
   h3 {
-    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--muted);
+    letter-spacing: 0.1em;
+    color: var(--off);
     margin: 0 0 0.5rem;
-    font-weight: 600;
+    font-weight: 500;
   }
 
   p {
@@ -488,21 +586,30 @@ verify: e2e
   }
 
   .lede {
-    font-size: clamp(1rem, 2.2vw, 1.25rem);
-    line-height: 1.5;
+    font-size: clamp(1rem, 1.4vw, 1.03125rem);
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 46ch;
+    margin: 0 0 1.6rem;
+    text-wrap: pretty;
+  }
+
+  .lede strong {
     color: var(--fg);
-    max-width: 34em;
-    margin: 0 0 1.75rem;
+    font-weight: 600;
+  }
+
+  .hero-cta {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
   }
 
   .hero-links {
     margin: 1.25rem 0 0;
     font-size: 14px;
     color: var(--muted);
-  }
-
-  .hero-links a {
-    text-decoration: none;
   }
 
   .hero-links a:hover {
@@ -518,7 +625,7 @@ verify: e2e
     display: flex;
     gap: 0.5rem;
     align-items: center;
-    margin: 1.75rem 0 0;
+    margin: 1.5rem 0 0;
     opacity: 0.85;
   }
 
@@ -528,19 +635,29 @@ verify: e2e
     display: block;
   }
 
+  /* A card, not a tinted strip: on a grey canvas the white is the emphasis. */
   .band {
     border: 1px solid var(--line);
     border-radius: var(--radius);
     background: var(--panel);
-    padding: 1.75rem 1.75rem 1.5rem;
+    padding: 1.75rem 2rem 1.5rem;
   }
 
   .band p:last-child {
     margin-bottom: 0;
   }
 
+  /* The three claims the tool actually makes. Numbering them says there are
+     exactly three and that they are meant to be read in order. */
+  .pillar .n {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent);
+    margin: 0 0 0.5rem;
+  }
+
   .caption {
-    color: var(--muted);
+    color: var(--off);
     font-size: 13px;
     margin-top: 0.75rem;
   }
@@ -567,7 +684,8 @@ verify: e2e
   }
 
   .steps strong {
-    font-weight: 620;
+    font-weight: 600;
+    color: var(--fg);
   }
 
   .pair {
@@ -578,8 +696,6 @@ verify: e2e
     margin-top: 1.5rem;
   }
 
-  /* Grid items default to min-width:auto, so a wide <pre> or <table> pushes
-     its track past the container instead of scrolling inside it. */
   .pair > * {
     min-width: 0;
   }
@@ -591,6 +707,9 @@ verify: e2e
 
   .scroll {
     overflow-x: auto;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
   }
 
   figure {
@@ -598,23 +717,27 @@ verify: e2e
   }
 
   figcaption {
-    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--muted);
+    letter-spacing: 0.1em;
+    color: var(--off);
     margin-bottom: 0.5rem;
-    font-weight: 600;
+    font-weight: 500;
   }
 
+  /* A behaviour file is read, not run — it stays on the dark ground with the
+     terminal output, because both are things the tool shows you verbatim. */
   .pair pre {
     margin: 0;
-    border: 1px solid var(--line);
+    border: 1px solid var(--terminal-line);
     border-radius: var(--radius);
-    background: var(--panel);
-    padding: 14px 16px;
+    background: var(--terminal);
+    color: var(--terminal-text);
+    padding: 16px 18px;
     overflow-x: auto;
     font-size: 12px;
-    line-height: 1.6;
+    line-height: 1.7;
   }
 
   .pair pre code {
@@ -629,43 +752,49 @@ verify: e2e
 
   th {
     text-align: left;
-    font-weight: 600;
+    font-family: var(--font-mono);
+    font-weight: 500;
     font-size: 11px;
-    color: var(--muted);
+    color: var(--off);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--line);
-    padding: 6px 8px;
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--rule);
+    padding: 10px 16px;
   }
 
   td {
-    padding: 7px 8px;
-    border-bottom: 1px solid var(--line);
+    padding: 9px 16px;
+    border-top: 1px solid var(--rule);
     vertical-align: top;
   }
 
-  tr:last-child td {
-    border-bottom: 0;
+  thead + tbody tr:first-child td {
+    border-top: 0;
   }
 
   td.num,
   th.num {
     text-align: right;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
     font-variant-numeric: tabular-nums;
   }
 
+  /* Tinted rather than outlined: a row can carry three of these, and three
+     ringed pills in a table cell read as controls. */
   .pill {
     display: inline-block;
-    font-size: 11px;
-    padding: 1px 7px;
-    border-radius: 999px;
-    border: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    padding: 1px 8px;
+    border-radius: 5px;
+    background: var(--tint-off);
     color: var(--muted);
     white-space: nowrap;
   }
 
   .pill.p0 {
-    border-color: var(--bad);
+    background: var(--tint-bad);
     color: var(--bad);
   }
 
@@ -684,42 +813,46 @@ verify: e2e
     border: 1px solid var(--line);
     border-radius: var(--radius);
     background: var(--panel);
-    padding: 1.25rem 1.35rem;
+    padding: 1.35rem 1.5rem;
   }
 
   .refusal h3 {
+    font-family: var(--font-sans);
     text-transform: none;
-    letter-spacing: -0.01em;
-    font-size: 0.95rem;
+    letter-spacing: -0.02em;
+    font-size: 1rem;
     color: var(--fg);
-    font-weight: 620;
+    font-weight: 700;
   }
 
   .refusal p {
     margin: 0;
     max-width: none;
-    font-size: 14px;
+    font-size: 14.5px;
     color: var(--muted);
   }
 
   .honest {
     color: var(--muted);
     font-size: 14px;
-    border-left: 2px solid var(--warn);
+    border-left: 3px solid var(--warn);
     padding-left: 1.1rem;
   }
 
   .cta {
     display: inline-block;
+    background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 0.5rem 0.9rem;
-    text-decoration: none;
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 1rem;
     font-size: 14px;
+    font-weight: 600;
+    color: var(--fg);
   }
 
   .cta:hover {
     border-color: var(--accent);
+    color: var(--accent);
   }
 
   .shot {
@@ -731,7 +864,7 @@ verify: e2e
     position: relative;
   }
 
-  /* The report shot is 2051px tall. Cropping it and fading the cut edge says
+  /* The report shot is 2360px tall. Cropping it and fading the cut edge says
      "there is more of this" without pretending the page ends there. */
   .shot::after {
     content: "";
@@ -748,12 +881,67 @@ verify: e2e
     height: auto;
   }
 
+  /* The last thing on the page is the dark ground the terminals are on: after
+     eight sections of evidence, the two commands are the only thing left. */
+  .cta-band {
+    background: var(--terminal);
+    border-radius: 14px;
+    padding: 2.75rem 3rem;
+    margin-top: 2.5rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 3rem;
+    align-items: center;
+  }
+
+  .cta-band h2 {
+    color: var(--terminal-fg);
+    margin-bottom: 0.5rem;
+  }
+
+  .cta-band p {
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--terminal-muted);
+    max-width: 48ch;
+  }
+
+  .cta-band code {
+    color: var(--terminal-text);
+  }
+
+  .cta-links {
+    margin-top: 1rem !important;
+    font-size: 14px;
+  }
+
+  .cta-links a {
+    color: var(--terminal-accent);
+  }
+
+  .cta-links a:hover {
+    text-decoration: underline;
+  }
+
+  .cta-links .sep {
+    color: var(--terminal-dim);
+  }
+
+  .cta-commands {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 2;
+    color: var(--terminal-text);
+    white-space: nowrap;
+  }
+
   footer {
-    max-width: 1000px;
+    max-width: 1180px;
     margin: 0 auto;
-    padding: 2rem 1.25rem 4rem;
+    padding: 2rem 2.5rem 4rem;
     border-top: 1px solid var(--line);
-    color: var(--muted);
+    color: var(--off);
     font-size: 13px;
   }
 
@@ -761,7 +949,32 @@ verify: e2e
     max-width: var(--measure);
   }
 
+  @media (max-width: 900px) {
+    .hero {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+      padding-top: 2.5rem;
+    }
+
+    .cta-band {
+      grid-template-columns: 1fr;
+      gap: 1.75rem;
+      padding: 2rem 1.75rem;
+    }
+  }
+
   @media (max-width: 720px) {
+    .nav,
+    main,
+    footer {
+      padding-left: 1.25rem;
+      padding-right: 1.25rem;
+    }
+
+    .nav nav {
+      gap: 1rem;
+    }
+
     .pair,
     .refusals {
       grid-template-columns: 1fr;
@@ -770,44 +983,51 @@ verify: e2e
     section {
       margin-top: 3.5rem;
     }
+  }
 
-    .hero {
-      margin-top: 3rem;
+  @media (max-width: 560px) {
+    .nav nav a:not(.button) {
+      display: none;
     }
   }
 </style>
 
 <style is:global>
-  /* Shared with the terminal cards, which render their content through a slot
-     and so are outside this component's scoped styles. */
+  /*
+   * Shared with the terminal cards, which render their content through a slot
+   * and so are outside this component's scoped styles.
+   *
+   * These are the DARK-ground colours in both themes, because a terminal card
+   * is dark in both themes. They exist nowhere else on the page — the light
+   * `--ok` / `--warn` / `--bad` are what the tables and pills use.
+   */
   .ok {
-    color: var(--ok);
+    color: var(--terminal-accent);
   }
 
   .warn {
-    color: var(--warn);
+    color: var(--terminal-warn);
   }
 
   .bad {
-    color: var(--bad);
+    color: var(--terminal-bad);
   }
 
   .b {
-    font-weight: 650;
-    color: var(--fg);
+    font-weight: 600;
+    color: var(--terminal-fg);
   }
 
   .dim {
-    color: var(--muted);
-    opacity: 0.75;
+    color: var(--terminal-dim);
   }
 
   .prompt {
-    color: var(--accent);
+    color: var(--terminal-accent);
   }
 
   .cmd {
-    color: var(--fg);
-    font-weight: 600;
+    color: var(--terminal-fg);
+    font-weight: 500;
   }
 </style>

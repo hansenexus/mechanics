@@ -1,10 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="mechanics">
   <!-- Two coverage meters: one full, one short of full with the gap left
-       showing. The gap is the product, so the mark is mostly the gap. -->
-  <rect width="32" height="32" rx="7" fill="#0c0d10"/>
-  <rect x="6" y="9"  width="20" height="4" rx="2" fill="#4ade80"/>
-  <rect x="6" y="16" width="20" height="4" rx="2" fill="#23252b"/>
-  <rect x="6" y="16" width="12" height="4" rx="2" fill="#fbbf24"/>
-  <rect x="6" y="23" width="20" height="4" rx="2" fill="#23252b"/>
-  <rect x="6" y="23" width="17" height="4" rx="2" fill="#4ade80"/>
+       showing. The gap is the product, so the mark is mostly the gap.
+       Slate's dark ground and its on-dark accent/warn, so the mark carries no
+       colour the rest of the site does not use. -->
+  <rect width="32" height="32" rx="7" fill="#191b1e"/>
+  <rect x="6" y="9"  width="20" height="4" rx="2" fill="#37b99f"/>
+  <rect x="6" y="16" width="20" height="4" rx="2" fill="#2a2d32"/>
+  <rect x="6" y="16" width="12" height="4" rx="2" fill="#e0b45c"/>
+  <rect x="6" y="23" width="20" height="4" rx="2" fill="#2a2d32"/>
+  <rect x="6" y="23" width="17" height="4" rx="2" fill="#37b99f"/>
 </svg>

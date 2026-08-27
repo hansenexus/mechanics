@@ -23,42 +23,50 @@ const SESSION = "mechanics-og";
 
 const HTML = `<!doctype html>
 <meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap">
 <style>
+  /* Slate's dark ground. A share card lands on someone else's timeline with
+     no theme of ours around it, so it commits to one — the terminal's, which
+     is the half of the palette that does not change between themes. The faces
+     fall back to the system stack: this renders in a headless browser with no
+     network guaranteed. */
   :root {
-    --bg: #0c0d10; --panel: #14161a; --line: #23252b; --fg: #e8e8ea;
-    --muted: #9096a2; --ok: #4ade80; --warn: #fbbf24; --accent: #60a5fa;
+    --bg: #101014; --panel: #191b1e; --line: #2a2d32; --fg: #f0f1f3;
+    --text: #b9bbc1; --muted: #8b8e96; --dim: #55575e;
+    --ok: #37b99f; --warn: #e0b45c; --accent: #37b99f;
+    --sans: "Bricolage Grotesque", ui-sans-serif, -apple-system, "Segoe UI",
+            system-ui, sans-serif;
+    --mono: "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
     width: 1200px; height: 630px; background: var(--bg); color: var(--fg);
-    font: 16px/1.5 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+    font: 16px/1.5 var(--sans);
     display: grid; grid-template-columns: 1fr 470px; align-items: center;
     gap: 56px; padding: 64px 64px 64px 72px;
   }
-  .mark { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-          font-size: 18px; font-weight: 650; color: var(--muted);
-          letter-spacing: -0.01em; margin-bottom: 26px; }
+  .mark { font-size: 18px; font-weight: 700; color: var(--fg);
+          letter-spacing: -0.02em; margin-bottom: 26px; }
   h1 { font-size: 62px; line-height: 1.04; letter-spacing: -0.035em;
-       font-weight: 660; margin: 0 0 22px; }
+       font-weight: 700; margin: 0 0 22px; }
   p { font-size: 23px; line-height: 1.42; color: var(--muted); margin: 0;
       max-width: 20ch; }
   p b { color: var(--fg); font-weight: 600; }
   .url { position: absolute; left: 72px; bottom: 52px; font-size: 17px;
-         color: var(--muted);
-         font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .card { border: 1px solid var(--line); border-radius: 14px;
-          background: var(--panel); overflow: hidden; }
+         color: var(--dim); font-family: var(--mono); }
+  .card { border-radius: 14px; background: var(--panel); overflow: hidden;
+          box-shadow: 0 20px 50px -28px rgba(0, 0, 0, 0.6); }
   .chrome { display: flex; align-items: center; gap: 7px; padding: 13px 17px;
-            border-bottom: 1px solid var(--line);
-            background: color-mix(in srgb, var(--line) 40%, transparent); }
+            border-bottom: 1px solid var(--line); }
   .chrome i { width: 11px; height: 11px; border-radius: 50%;
-              background: var(--line); }
-  pre { margin: 0; padding: 20px 22px;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 15px; line-height: 1.78; white-space: pre; }
+              background: #34363c; }
+  pre { margin: 0; padding: 20px 22px; font-family: var(--mono);
+        font-size: 15px; line-height: 1.78; white-space: pre;
+        color: var(--text); }
   .ok { color: var(--ok); } .warn { color: var(--warn); }
-  .dim { color: var(--muted); opacity: .7; } .b { font-weight: 650; }
+  .dim { color: var(--dim); } .b { font-weight: 600; color: var(--fg); }
 </style>
 <body>
   <div>

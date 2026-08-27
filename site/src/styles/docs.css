@@ -1,7 +1,9 @@
 /*
- * Starlight's chrome, repainted with the tool's tokens. Only the variables
- * Starlight actually reads are set — restyling its components directly would
- * break on the next minor.
+ * Starlight's chrome, repainted with the tool's Slate tokens. Only the
+ * variables Starlight actually reads are set — restyling its components
+ * directly would break on the next minor. The handful of rules below the
+ * variable blocks are the places where Slate says something Starlight has no
+ * variable for.
  */
 :root {
   --sl-font: var(--font-sans);
@@ -9,47 +11,72 @@
   --sl-content-width: 50rem;
 }
 
+/* The header is a white bar over the grey canvas — that contrast is what makes
+   the canvas read as canvas. The sidebar stays on the canvas and is separated
+   by a hairline, exactly as the content area is. */
 :root[data-theme="dark"] {
   --sl-color-bg: var(--bg);
-  --sl-color-bg-nav: var(--bg);
+  --sl-color-bg-nav: var(--panel);
   --sl-color-bg-sidebar: var(--bg);
   --sl-color-bg-inline-code: var(--panel);
-  --sl-color-text: var(--fg);
+  --sl-color-text: var(--text);
   --sl-color-text-accent: var(--accent);
+  /* Starlight names these for its dark theme and swaps them in light: `white`
+     is always the strongest text and `black` is always the page ground. Set
+     both in both themes rather than relying on which way round it is — the
+     search button reads `black` as a background, and a token that means "text"
+     there paints an unreadable slab. */
   --sl-color-white: var(--fg);
-  --sl-color-gray-1: #e8e8ea;
-  --sl-color-gray-2: #c7cbd3;
+  --sl-color-black: var(--bg);
+  --sl-color-gray-1: #f0f1f3;
+  --sl-color-gray-2: #b9bbc1;
   --sl-color-gray-3: var(--muted);
-  --sl-color-gray-4: #5b616c;
+  --sl-color-gray-4: var(--off);
   --sl-color-gray-5: var(--line);
   --sl-color-gray-6: var(--panel);
   --sl-color-hairline: var(--line);
-  --sl-color-hairline-light: var(--line);
+  --sl-color-hairline-light: var(--rule);
   --sl-color-accent: var(--accent);
-  --sl-color-accent-low: #16324f;
-  --sl-color-accent-high: #a9c9ef;
+  --sl-color-accent-low: #123c36;
+  --sl-color-accent-high: #8fd9c9;
 }
 
 :root[data-theme="light"] {
   --sl-color-bg: var(--bg);
-  --sl-color-bg-nav: var(--bg);
+  --sl-color-bg-nav: var(--panel);
   --sl-color-bg-sidebar: var(--bg);
   --sl-color-bg-inline-code: var(--panel);
-  --sl-color-text: var(--fg);
+  --sl-color-text: var(--text);
   --sl-color-text-accent: var(--accent);
-  --sl-color-black: var(--fg);
-  --sl-color-gray-1: #16161a;
-  --sl-color-gray-2: #33363d;
+  --sl-color-white: var(--fg);
+  --sl-color-black: var(--bg);
+  --sl-color-gray-1: #191b1e;
+  --sl-color-gray-2: #3a3d42;
   --sl-color-gray-3: var(--muted);
-  --sl-color-gray-4: #9aa1ac;
+  --sl-color-gray-4: var(--off);
   --sl-color-gray-5: var(--line);
   --sl-color-gray-6: var(--panel);
-  --sl-color-gray-7: #f3f4f6;
+  --sl-color-gray-7: var(--rule);
   --sl-color-hairline: var(--line);
-  --sl-color-hairline-light: var(--line);
+  --sl-color-hairline-light: var(--rule);
   --sl-color-accent: var(--accent);
-  --sl-color-accent-low: #dbeafe;
-  --sl-color-accent-high: #1d4ed8;
+  --sl-color-accent-low: #d7ece7;
+  --sl-color-accent-high: #0a574c;
+}
+
+/* Headings are the display face doing display work: tighter tracking and more
+   weight than Starlight's default, which is tuned for a generic docs voice. */
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+.content-panel h1 {
+  letter-spacing: -0.025em;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.sl-markdown-content {
+  line-height: 1.7;
 }
 
 /* The docs are prose about a CLI: tables of commands and flags are half the
@@ -62,6 +89,46 @@
   white-space: nowrap;
 }
 
+/* A table is a card, like every other block of evidence on the site. Starlight
+   renders a bare table, so the frame is drawn here. */
+.sl-markdown-content table {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+}
+
+.sl-markdown-content table th {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--off);
+  border-bottom: 1px solid var(--rule);
+}
+
+.sl-markdown-content table td {
+  border-top: 1px solid var(--rule);
+  border-bottom: 0;
+}
+
+.sl-markdown-content table thead + tbody tr:first-child td {
+  border-top: 0;
+}
+
+/* Inline code is a chip on the card, not a tinted run of text: the docs use it
+   for flags and paths, which are things you copy. */
+.sl-markdown-content :not(pre) > code {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 0.1em 0.4em;
+  font-size: 0.8125em;
+  color: var(--text);
+}
+
 .sl-markdown-content :not(a, strong, em, del, span, input, code, pre) + :is(h2, h3) {
   margin-top: 2.25rem;
 }
@@ -72,7 +139,7 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.8125rem;
-  color: var(--muted);
+  color: var(--off);
   text-decoration: none;
 }
 
@@ -86,19 +153,41 @@
 .site-title {
   font-family: var(--font-mono);
   font-size: 0.9375rem;
-  font-weight: 650;
+  font-weight: 500;
   color: var(--fg);
   letter-spacing: -0.01em;
 }
 
+/* Group labels are set like the section labels in the report and the TUI —
+   small, mono, spaced — so the three surfaces share one way of saying
+   "this names the block below it". */
+.sidebar-content .large {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--off);
+}
+
+.sidebar-content ul {
+  border-inline-start: 0;
+}
+
+.sidebar-content li > a {
+  border-inline-start: 2px solid transparent;
+  border-radius: 0;
+}
+
 /* Starlight fills the current sidebar item with the accent colour. Against a
-   page whose only other saturated colour is a pass/fail signal, a solid blue
-   block reads as a status. A rule and a weight say "you are here" without
-   competing with the coverage bars. */
+   page whose only other saturated colour is a pass/fail signal, a solid block
+   reads as a status. A rail and a weight say "you are here" without competing
+   with the coverage bars. */
 .sidebar-content a[aria-current="page"],
 .sidebar-content a[aria-current="page"]:hover,
 .sidebar-content a[aria-current="page"]:focus {
   background-color: transparent;
+  border-inline-start-color: var(--accent);
   color: var(--accent);
   font-weight: 600;
 }

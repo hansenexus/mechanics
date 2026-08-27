@@ -1,41 +1,80 @@
 /*
- * The palette is not invented here. These are the tokens `report.ts` and
- * `scripts/shots.mjs` already ship, copied verbatim, so a terminal block on
- * this page and the same block in a generated report are the same colours.
+ * Slate. The palette is not invented here. These are the tokens `report.ts`
+ * and `scripts/shots.mjs` already ship, copied verbatim, so a terminal block
+ * on this page and the same block in a generated report are the same colours.
  * If the tool's palette changes, change it there first and mirror it here.
+ *
+ * The page is a grey canvas carrying white cards, which is why `--bg` is the
+ * darker of the two: a table or a code block reads as an object you can point
+ * at, rather than as more page. `--terminal` is deliberately not `--bg` in
+ * either theme — terminal output is dark wherever it appears, because that is
+ * what a terminal looks like and the screenshots have to agree with the page.
  */
 :root {
   color-scheme: light dark;
-  --bg: #ffffff;
-  --fg: #16161a;
-  --muted: #6b7280;
-  --line: #e5e7eb;
-  --panel: #f9fafb;
-  --accent: #2563eb;
-  --ok: #16a34a;
-  --warn: #d97706;
-  --bad: #dc2626;
-  --off: #6b7280;
+  --bg: #eef0f3;
+  --panel: #ffffff;
+  --fg: #191b1e;
+  --text: #3a3d42;
+  --muted: #6e7178;
+  --off: #a9adb5;
+  --line: #d9dce1;
+  --rule: #e6e8ec;
+  --track: #e6e8ec;
+  --accent: #0f7b6c;
+  --accent-hover: #0a574c;
+  --ok: #0f7b6c;
+  --warn: #b3690f;
+  --bad: #c4392e;
+  --tint-accent: rgba(15, 123, 108, 0.1);
+  --tint-warn: rgba(179, 105, 15, 0.09);
+  --tint-bad: rgba(196, 57, 46, 0.08);
+  --tint-off: rgba(110, 113, 120, 0.1);
 
-  --font-sans: ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* The dark surface, which is the same in both themes. Terminal cards, the
+     TUI shots and the closing band all sit on it. */
+  --terminal: #191b1e;
+  --terminal-line: #2a2d32;
+  --terminal-fg: #f0f1f3;
+  --terminal-text: #b9bbc1;
+  --terminal-muted: #8b8e96;
+  --terminal-dim: #55575e;
+  --terminal-accent: #37b99f;
+  --terminal-warn: #e0b45c;
+  --terminal-bad: #e8837a;
 
-  --radius: 10px;
+  --font-sans: "Bricolage Grotesque", ui-sans-serif, -apple-system, "Segoe UI",
+    system-ui, sans-serif;
+  --font-mono: "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius: 12px;
+  --radius-sm: 8px;
   --measure: 62ch;
 }
 
+/* Dark is the same system with the canvas and the card both moved onto the
+   terminal's ground: canvas #101014, card #191b1e. The accent lightens to the
+   value the terminal already uses, so one teal serves both themes. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0c0d10;
-    --fg: #e8e8ea;
-    --muted: #9096a2;
-    --line: #23252b;
-    --panel: #14161a;
-    --accent: #60a5fa;
-    --ok: #4ade80;
-    --warn: #fbbf24;
-    --bad: #f87171;
-    --off: #7c828e;
+    --bg: #101014;
+    --panel: #191b1e;
+    --fg: #f0f1f3;
+    --text: #b9bbc1;
+    --muted: #8b8e96;
+    --off: #55575e;
+    --line: #2a2d32;
+    --rule: #232529;
+    --track: #2a2d32;
+    --accent: #37b99f;
+    --accent-hover: #5fcbb4;
+    --ok: #37b99f;
+    --warn: #e0b45c;
+    --bad: #e8837a;
+    --tint-accent: rgba(55, 185, 159, 0.14);
+    --tint-warn: rgba(224, 180, 92, 0.12);
+    --tint-bad: rgba(232, 131, 122, 0.12);
+    --tint-off: rgba(185, 187, 193, 0.1);
   }
 }
 
@@ -44,27 +83,43 @@
    these two blocks the docs pages would fall back to Starlight's palette and
    the two halves of the site would not match. */
 [data-theme="light"] {
-  --bg: #ffffff;
-  --fg: #16161a;
-  --muted: #6b7280;
-  --line: #e5e7eb;
-  --panel: #f9fafb;
-  --accent: #2563eb;
-  --ok: #16a34a;
-  --warn: #d97706;
-  --bad: #dc2626;
-  --off: #6b7280;
+  --bg: #eef0f3;
+  --panel: #ffffff;
+  --fg: #191b1e;
+  --text: #3a3d42;
+  --muted: #6e7178;
+  --off: #a9adb5;
+  --line: #d9dce1;
+  --rule: #e6e8ec;
+  --track: #e6e8ec;
+  --accent: #0f7b6c;
+  --accent-hover: #0a574c;
+  --ok: #0f7b6c;
+  --warn: #b3690f;
+  --bad: #c4392e;
+  --tint-accent: rgba(15, 123, 108, 0.1);
+  --tint-warn: rgba(179, 105, 15, 0.09);
+  --tint-bad: rgba(196, 57, 46, 0.08);
+  --tint-off: rgba(110, 113, 120, 0.1);
 }
 
 [data-theme="dark"] {
-  --bg: #0c0d10;
-  --fg: #e8e8ea;
-  --muted: #9096a2;
-  --line: #23252b;
-  --panel: #14161a;
-  --accent: #60a5fa;
-  --ok: #4ade80;
-  --warn: #fbbf24;
-  --bad: #f87171;
-  --off: #7c828e;
+  --bg: #101014;
+  --panel: #191b1e;
+  --fg: #f0f1f3;
+  --text: #b9bbc1;
+  --muted: #8b8e96;
+  --off: #55575e;
+  --line: #2a2d32;
+  --rule: #232529;
+  --track: #2a2d32;
+  --accent: #37b99f;
+  --accent-hover: #5fcbb4;
+  --ok: #37b99f;
+  --warn: #e0b45c;
+  --bad: #e8837a;
+  --tint-accent: rgba(55, 185, 159, 0.14);
+  --tint-warn: rgba(224, 180, 92, 0.12);
+  --tint-bad: rgba(232, 131, 122, 0.12);
+  --tint-off: rgba(185, 187, 193, 0.1);
 }

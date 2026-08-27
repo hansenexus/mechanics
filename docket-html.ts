@@ -49,36 +49,54 @@ export type RenderOptions = {
   title?: string;
 };
 
+/*
+ * Slate — the same canvas-and-cards palette `report.ts` ships, with this
+ * page's own liveness names mapped onto it. The two look alike on purpose:
+ * a reader who has seen one report should not have to re-learn what amber
+ * means when they open the run board.
+ *
+ * `idle` is the one hue Slate does not otherwise use. It has to be legible as
+ * "not stalled, not waiting on you" at a glance, which neither the accent nor
+ * the greys can say, so it gets a blue of its own.
+ */
 const STYLES = `
 :root {
   color-scheme: light dark;
-  --bg: #ffffff; --fg: #16161a; --muted: #6b7280; --line: #e5e7eb;
-  --panel: #f9fafb; --accent: #2563eb;
-  --working: #16a34a; --waiting: #d97706; --stalled: #dc2626; --done: #6b7280;
-  --idle: #0284c7;
+  --bg: #eef0f3; --fg: #191b1e; --text: #3a3d42; --muted: #6e7178;
+  --off: #a9adb5; --line: #d9dce1; --panel: #ffffff; --track: #e6e8ec;
+  --accent: #0f7b6c;
+  --working: #0f7b6c; --waiting: #b3690f; --stalled: #c4392e; --done: #a9adb5;
+  --idle: #3d6d8c; --tint-accent: rgba(15, 123, 108, 0.1);
+  --mono: "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0c0d10; --fg: #e8e8ea; --muted: #9096a2; --line: #23252b;
-    --panel: #14161a; --accent: #60a5fa;
-    --working: #4ade80; --waiting: #fbbf24; --stalled: #f87171; --done: #7c828e;
-    --idle: #38bdf8;
+    --bg: #101014; --fg: #f0f1f3; --text: #b9bbc1; --muted: #8b8e96;
+    --off: #55575e; --line: #2a2d32; --panel: #191b1e; --track: #2a2d32;
+    --accent: #37b99f;
+    --working: #37b99f; --waiting: #e0b45c; --stalled: #e8837a; --done: #55575e;
+    --idle: #7fb2d0; --tint-accent: rgba(55, 185, 159, 0.14);
   }
 }
 * { box-sizing: border-box; }
 body {
-  margin: 0; background: var(--bg); color: var(--fg);
-  font: 14px/1.5 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.55 "Bricolage Grotesque", ui-sans-serif, -apple-system,
+        "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
-main { max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }
+main { max-width: 1100px; margin: 0 auto; padding: 40px 24px 64px; }
 header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
-h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
-.sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
-.live { margin-left: auto; font-size: 12px; color: var(--muted); }
+h1 { font-size: 24px; margin: 0; letter-spacing: -0.02em; font-weight: 700;
+     color: var(--fg); }
+.sub { color: var(--off); font-size: 12.5px; font-family: var(--mono);
+       margin-bottom: 24px; }
+.live { margin-left: auto; font-size: 12px; color: var(--off);
+        font-family: var(--mono); }
 .live b { color: var(--working); }
 .runs { display: flex; flex-direction: column; gap: 8px; }
 .run {
-  border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 12px; background: var(--panel);
   overflow: hidden;
 }
 /* Flex rather than a fixed grid: the meta group wraps to its own line on a
@@ -96,7 +114,7 @@ h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
 .dot.idle    { background: var(--idle); }
 .dot.stalled { background: var(--stalled); }
 .dot.done    { background: var(--done); }
-.title { font-weight: 550; flex: 1 1 220px; min-width: 0; }
+.title { font-weight: 600; color: var(--fg); flex: 1 1 220px; min-width: 0; }
 .title span, .title small { display: block; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
 .title small { font-weight: 400; color: var(--muted); font-size: 12px; }
@@ -112,27 +130,30 @@ h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
   .meta { margin-left: 21px; flex-wrap: wrap; gap: 10px 14px; }
   .title { flex: 1 1 100%; }
 }
-.mono { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums;
+        font-size: 12.5px; color: var(--muted); }
 .bar { display: flex; gap: 3px; align-items: center; flex: none; }
-.cell { width: 16px; height: 6px; border-radius: 2px; background: var(--line); }
+.cell { width: 16px; height: 6px; border-radius: 3px; background: var(--track); }
 .cell.on { background: var(--working); }
 .state { font-size: 13px; }
 /* waiting and stalled are bold because they are the two that want you;
    idle is coloured but not bold — it is information, not a summons. */
-.state.waiting { color: var(--waiting); font-weight: 550; }
-.state.stalled { color: var(--stalled); font-weight: 550; }
+.state.waiting { color: var(--waiting); font-weight: 600; }
+.state.stalled { color: var(--stalled); font-weight: 600; }
 .state.idle    { color: var(--idle); }
 .detail { display: none; padding: 4px 14px 18px; border-top: 1px solid var(--line); }
 .run[open] .detail { display: block; }
 .phases { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0; }
 .phase {
-  font-size: 12px; padding: 3px 9px; border-radius: 999px;
-  border: 1px solid var(--line); color: var(--muted);
+  font-family: var(--mono); font-size: 11px; padding: 3px 10px;
+  border-radius: 6px; background: var(--track); color: var(--muted);
 }
-.phase.now { border-color: var(--accent); color: var(--accent); font-weight: 550; }
+.phase.now { background: var(--tint-accent); color: var(--accent);
+             font-weight: 500; }
 .phase.past { opacity: 0.55; }
-h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
-     color: var(--muted); margin: 18px 0 8px; font-weight: 600; }
+h3 { font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+     letter-spacing: 0.1em; color: var(--off); margin: 22px 0 8px;
+     font-weight: 500; }
 ul.crit { list-style: none; padding: 0; margin: 0; display: flex;
           flex-direction: column; gap: 5px; }
 ul.crit li { display: flex; gap: 9px; align-items: baseline; font-size: 13px; }
@@ -143,7 +164,7 @@ ul.crit li { display: flex; gap: 9px; align-items: baseline; font-size: 13px; }
 .pending { color: var(--muted); }
 .ev { color: var(--muted); font-size: 12px; }
 .shots { display: flex; flex-wrap: wrap; gap: 10px; }
-.shots a { display: block; border: 1px solid var(--line); border-radius: 6px;
+.shots a { display: block; border: 1px solid var(--line); border-radius: 8px;
            overflow: hidden; }
 .shots img { display: block; width: 168px; height: 108px; object-fit: cover; }
 .note { color: var(--muted); font-size: 13px; }
