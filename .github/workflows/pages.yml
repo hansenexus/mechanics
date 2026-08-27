@@ -12,6 +12,15 @@ name: pages
 #   report  — run THIS checkout's CLI against examples/perch and drop the real
 #             HTML report at /report/. The landing page links to it, so the
 #             link has to be a real artefact rather than a picture of one.
+#
+# The custom domain (mechanics.hansenexus.dev) lives in the repo's Pages
+# SETTINGS, not in a CNAME file. A `public/CNAME` in the artifact is how
+# branch-based Pages is configured and is inert for an Actions deployment —
+# this repo shipped one, and the deploy left `cname` null until the domain was
+# set through the API. Kept as a comment because the file looked load-bearing
+# and was not, which is the kind of thing worth writing down once:
+#
+#     gh api -X PUT repos/hansenexus/mechanics/pages -f cname=mechanics.hansenexus.dev
 
 on:
   push:
