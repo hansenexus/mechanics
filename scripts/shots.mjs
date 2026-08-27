@@ -15,6 +15,12 @@
  *
  * Requires `agent-browser` on PATH (https://github.com/anthropics/agent-browser)
  * and its browser installed (`agent-browser install`).
+ *
+ * The card HTML links Google Fonts, which is the one place in this repo that
+ * is allowed to: the output is a committed PNG, so the request happens on the
+ * machine regenerating the shots and never on a reader's. Without it the cards
+ * would be set in the system mono while the site sets the same text in Fira
+ * Code, and the two would stop being pictures of each other.
  */
 
 import { spawn, spawnSync } from "node:child_process";
@@ -129,44 +135,50 @@ ${ansiToHtml(c.output)}</pre>
 
   return `<!doctype html>
 <meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap">
 <style>
+  /* Slate's dark ground — the same values the site's TerminalCard component
+     uses, so a card on the site and the PNG beside it are the same picture. */
   :root {
-    --bg: #0c0d10; --panel: #14161a; --line: #23252b; --fg: #e8e8ea;
-    --muted: #9096a2; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
-    --accent: #60a5fa;
+    --bg: #101014; --panel: #191b1e; --line: #2a2d32; --fg: #f0f1f3;
+    --text: #b9bbc1; --muted: #8b8e96; --dim: #55575e;
+    --ok: #37b99f; --warn: #e0b45c; --bad: #e8837a; --accent: #37b99f;
+    --mono: "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; background: var(--bg); color: var(--fg); padding: 28px;
-    font: 14px/1.5 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+    margin: 0; background: var(--bg); color: var(--text); padding: 28px;
+    font: 14px/1.5 "Bricolage Grotesque", ui-sans-serif, -apple-system,
+          "Segoe UI", system-ui, sans-serif;
   }
   .card {
-    border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 12px; background: var(--panel);
     overflow: hidden; margin-bottom: 20px;
   }
   .card:last-child { margin-bottom: 0; }
   .chrome {
-    display: flex; align-items: center; gap: 6px;
-    padding: 9px 13px; border-bottom: 1px solid var(--line);
-    background: color-mix(in srgb, var(--line) 40%, transparent);
+    display: flex; align-items: center; gap: 7px;
+    padding: 12px 17px; border-bottom: 1px solid var(--line);
   }
   .chrome i {
-    width: 10px; height: 10px; border-radius: 50%; background: var(--line);
+    width: 10px; height: 10px; border-radius: 50%; background: #34363c;
     flex: none;
   }
-  .chrome span { margin-left: 8px; color: var(--muted); font-size: 12px; }
+  .chrome span { margin-left: 9px; color: var(--muted); font-family: var(--mono);
+                 font-size: 11.5px; }
   pre {
-    margin: 0; padding: 15px 17px; overflow-x: auto;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12.5px; line-height: 1.62; white-space: pre;
+    margin: 0; padding: 17px 20px; overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 12.5px; line-height: 1.75; white-space: pre; color: var(--text);
   }
   .prompt { color: var(--accent); }
-  .cmd { color: var(--fg); font-weight: 600; }
+  .cmd { color: var(--fg); font-weight: 500; }
   .ok { color: var(--ok); }
   .warn { color: var(--warn); }
   .bad { color: var(--bad); }
-  .b { font-weight: 650; color: var(--fg); }
-  .dim { color: var(--muted); opacity: .65; }
+  .b { font-weight: 600; color: var(--fg); }
+  .dim { color: var(--dim); }
 </style>
 ${blocks}
 `;
@@ -249,8 +261,12 @@ async function main() {
     const reportHtml = path.join(WORK, "report.html");
     cli(["report", "--html", `--out=${reportHtml}`]);
 
-    console.log("shooting (dark, 1180px)…");
-    await ab(["set", "media", "dark"]);
+    // Light, not dark. The terminal cards paint their own dark ground whatever
+    // the media query says, so this only decides which way the report goes —
+    // and Slate's report is a grey canvas with white cards. Shooting it dark
+    // would put a near-black slab in the middle of a light page.
+    console.log("shooting (light, 1180px)…");
+    await ab(["set", "media", "light"]);
 
     await shoot(covHtml, path.join(OUT, "coverage.png"));
     await shoot(gateHtml, path.join(OUT, "drift-gate.png"));

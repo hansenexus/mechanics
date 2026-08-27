@@ -30,6 +30,16 @@ const ogImage = new URL("/og.png", Astro.site);
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
+
+    <!-- Bricolage Grotesque and Fira Code are the Slate faces. Both stacks in
+         tokens.css end in the system fonts, so a blocked or slow Google Fonts
+         request costs the page its typography and nothing else. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+    />
   </head>
   <body>
     <slot />
@@ -54,13 +64,18 @@ const ogImage = new URL("/og.png", Astro.site);
   body {
     margin: 0;
     background: var(--bg);
-    color: var(--fg);
+    color: var(--text);
     font: 15px/1.6 var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
 
   a {
     color: var(--accent);
+    text-decoration: none;
+  }
+
+  a:hover {
+    color: var(--accent-hover);
   }
 
   code {
