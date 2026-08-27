@@ -60,6 +60,7 @@
     "./adapters": "./adapters.ts",
     "./discover": "./discover.ts",
     "./coverage": "./coverage.ts",
+    "./decisions": "./decisions.ts",
     "./manifest": "./manifest.ts",
     "./verify": "./verify.ts",
     "./screens": "./screens.ts",

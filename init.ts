@@ -326,6 +326,11 @@ a service.
     mechanics run new --title="…"     open a work order
     mechanics run list                board: runs in flight
     mechanics run show --run=<id>     phases, criteria, evidence
+
+\`decisions/<id>.md\` holds decision records — ADRs whose \`affects.paths\` makes
+them retrievable by the file an agent is about to touch. The id is the
+filename. \`mechanics check\` errors on an \`accepted\` record whose paths match
+no files: a decision pointing at deleted code must be superseded or rejected.
 `;
 
 // ---------------------------------------------------------------------------

@@ -64,6 +64,7 @@ describe("mechanics MCP: the surface it refuses to grow", () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "mechanics_coverage",
+      "mechanics_decisions",
       "mechanics_get",
       "mechanics_impact",
       "mechanics_list",

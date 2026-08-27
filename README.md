@@ -148,11 +148,12 @@ corpus's life:
 |---|---|
 | **Core** | parser, schema, manifest, coverage, waves, verify, CLI |
 | **Adapters** | `nextjs-app-router`, `convex`, `generic-glob` — plus the `SurfaceAdapter` seam, so a stack nobody wrote an adapter for declares its surfaces in config instead of forking |
-| **MCP** | five read tools over stdio: list, get, coverage, wave status, diff impact |
+| **MCP** | six read tools over stdio: list, get, coverage, wave status, diff impact, decisions |
 | **Report** | `--html`: one file, no build step, no external request |
 | **TUI** | `mechanics tui` — the always-open view: drift, issues, runs, proposals, updates |
 | **Agents** | `claude`, `codex`, `qwen`, `ollama`, `lmstudio` — harnesses edit directly, models edit through a validated protocol |
 | **Gaps** | the five gap classes as predicates, each tagged `auto` (one correct answer) or `propose` (a judgment) — `gaps --fix` applies the first kind and refuses the rest in code |
+| **[Decisions](./spec/docket-1.md#decision-records)** | `.docket/decisions/` — ADRs retrievable by the file you are about to touch; an accepted record whose `affects.paths` matches nothing fails `check`, and two open runs deciding about one subsystem get flagged |
 | **[docket/1](./spec/docket-1.md)** | the run protocol — work orders with checkable exit criteria and an append-only event log, with [executable conformance vectors](./spec/docket-1.vectors.json) |
 | **[Plugin](./plugin/)** | three Claude Code skills: init, verify, gaps |
 
