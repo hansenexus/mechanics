@@ -1,5 +1,7 @@
 # mechanics
 
+**[mechanics.hansenexus.dev](https://mechanics.hansenexus.dev)** — docs, and a live coverage report.
+
 [![npm](https://img.shields.io/npm/v/@hansenexus/mechanics?logo=npm&color=cb3837)](https://www.npmjs.com/package/@hansenexus/mechanics)
 [![ci](https://github.com/hansenexus/mechanics/actions/workflows/ci.yml/badge.svg)](https://github.com/hansenexus/mechanics/actions/workflows/ci.yml)
 [![licence](https://img.shields.io/npm/l/@hansenexus/mechanics?color=blue)](./LICENSE)

@@ -1,0 +1,104 @@
+/*
+ * Starlight's chrome, repainted with the tool's tokens. Only the variables
+ * Starlight actually reads are set — restyling its components directly would
+ * break on the next minor.
+ */
+:root {
+  --sl-font: var(--font-sans);
+  --sl-font-mono: var(--font-mono);
+  --sl-content-width: 50rem;
+}
+
+:root[data-theme="dark"] {
+  --sl-color-bg: var(--bg);
+  --sl-color-bg-nav: var(--bg);
+  --sl-color-bg-sidebar: var(--bg);
+  --sl-color-bg-inline-code: var(--panel);
+  --sl-color-text: var(--fg);
+  --sl-color-text-accent: var(--accent);
+  --sl-color-white: var(--fg);
+  --sl-color-gray-1: #e8e8ea;
+  --sl-color-gray-2: #c7cbd3;
+  --sl-color-gray-3: var(--muted);
+  --sl-color-gray-4: #5b616c;
+  --sl-color-gray-5: var(--line);
+  --sl-color-gray-6: var(--panel);
+  --sl-color-hairline: var(--line);
+  --sl-color-hairline-light: var(--line);
+  --sl-color-accent: var(--accent);
+  --sl-color-accent-low: #16324f;
+  --sl-color-accent-high: #a9c9ef;
+}
+
+:root[data-theme="light"] {
+  --sl-color-bg: var(--bg);
+  --sl-color-bg-nav: var(--bg);
+  --sl-color-bg-sidebar: var(--bg);
+  --sl-color-bg-inline-code: var(--panel);
+  --sl-color-text: var(--fg);
+  --sl-color-text-accent: var(--accent);
+  --sl-color-black: var(--fg);
+  --sl-color-gray-1: #16161a;
+  --sl-color-gray-2: #33363d;
+  --sl-color-gray-3: var(--muted);
+  --sl-color-gray-4: #9aa1ac;
+  --sl-color-gray-5: var(--line);
+  --sl-color-gray-6: var(--panel);
+  --sl-color-gray-7: #f3f4f6;
+  --sl-color-hairline: var(--line);
+  --sl-color-hairline-light: var(--line);
+  --sl-color-accent: var(--accent);
+  --sl-color-accent-low: #dbeafe;
+  --sl-color-accent-high: #1d4ed8;
+}
+
+/* The docs are prose about a CLI: tables of commands and flags are half the
+   content, and Starlight's default table sizing wraps them badly. */
+.sl-markdown-content table {
+  font-size: 0.875rem;
+}
+
+.sl-markdown-content table code {
+  white-space: nowrap;
+}
+
+.sl-markdown-content :not(a, strong, em, del, span, input, code, pre) + :is(h2, h3) {
+  margin-top: 2.25rem;
+}
+
+/* Back to the landing page, which is not in the sidebar. */
+.site-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.site-back:hover {
+  color: var(--fg);
+}
+
+/* The product name is lowercase and monospace everywhere else; Starlight's
+   default site title is large sans in the accent colour, which reads as a
+   different product. */
+.site-title {
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  font-weight: 650;
+  color: var(--fg);
+  letter-spacing: -0.01em;
+}
+
+/* Starlight fills the current sidebar item with the accent colour. Against a
+   page whose only other saturated colour is a pass/fail signal, a solid blue
+   block reads as a status. A rule and a weight say "you are here" without
+   competing with the coverage bars. */
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover,
+.sidebar-content a[aria-current="page"]:focus {
+  background-color: transparent;
+  color: var(--accent);
+  font-weight: 600;
+}

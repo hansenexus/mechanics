@@ -1,0 +1,83 @@
+---
+/**
+ * The same card the screenshots are shot in — chrome dots, caption bar,
+ * monospace body — ported from `scripts/shots.mjs` so terminal output on this
+ * page is visually identical to `docs/images/*.png`.
+ *
+ * Rendered as real text rather than an image on purpose: it is selectable,
+ * copyable, sharp at any density, and it reflows on a phone, which a
+ * 1180px-wide PNG does not.
+ */
+interface Props {
+  caption: string;
+  command?: string;
+}
+
+const { caption, command } = Astro.props;
+---
+
+<section class="card">
+  <div class="chrome">
+    <i></i><i></i><i></i><span>{caption}</span>
+  </div>
+  <pre>{command && <><span class="prompt">$</span> <span class="cmd">{command}</span>{"\n"}</>}<slot /></pre>
+</section>
+
+<style>
+  .card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--panel);
+    overflow: hidden;
+  }
+
+  .chrome {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 13px;
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--line) 40%, transparent);
+  }
+
+  .chrome i {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--line);
+    flex: none;
+  }
+
+  .chrome span {
+    margin-left: 8px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  pre {
+    margin: 0;
+    padding: 15px 17px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.62;
+    white-space: pre;
+    color: var(--fg);
+  }
+
+  .prompt {
+    color: var(--accent);
+  }
+
+  .cmd {
+    color: var(--fg);
+    font-weight: 600;
+  }
+
+  @media (max-width: 560px) {
+    pre {
+      font-size: 11px;
+      padding: 12px 13px;
+    }
+  }
+</style>

@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.astro/
+
+# Copied from ../docs/images by scripts/assets.mjs on every dev and build.
+public/images/
+.og/

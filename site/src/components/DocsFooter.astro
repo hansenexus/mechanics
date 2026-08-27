@@ -1,0 +1,28 @@
+---
+import Default from "@astrojs/starlight/components/Footer.astro";
+---
+
+<Default><slot /></Default>
+
+<div class="site-footer">
+  <a class="site-back" href="/">← mechanics</a>
+  <span>
+    MIT · <a href="https://github.com/hansenexus/mechanics">source</a> · built by <a
+      href="https://hansenexus.dev">hansenexus</a>
+  </span>
+</div>
+
+<style>
+  .site-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+</style>

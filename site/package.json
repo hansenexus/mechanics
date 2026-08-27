@@ -1,0 +1,17 @@
+{
+  "name": "mechanics-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/assets.mjs && astro dev",
+    "build": "node scripts/assets.mjs && astro build && node scripts/report.mjs",
+    "preview": "astro preview",
+    "check": "astro check",
+    "og": "node scripts/og.mjs"
+  },
+  "dependencies": {
+    "astro": "^7.2.6",
+    "@astrojs/starlight": "^0.41.8",
+    "sharp": "^0.34.4"
+  }
+}
