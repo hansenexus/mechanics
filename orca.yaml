@@ -8,6 +8,11 @@ scripts:
     export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"
     cd "${ORCA_WORKTREE_PATH:-$PWD}"
     bun install --frozen-lockfile || echo "orca-setup: bun install --frozen-lockfile failed — run it manually before building"
+    # Tabs are launched BEFORE this hook (Orca awaits every defaultTab, then
+    # spawns the setup tab), so they wait on this marker. It records that setup
+    # FINISHED, not that it succeeded — a tab must still run and show the real
+    # error. It lives in the git dir so `git status` never sees it.
+    touch "$(git rev-parse --git-dir)/orca-setup-done" 2>/dev/null || true
 issueCommand: |
   Work the GitHub issue at {{artifact_url}}.
 
@@ -23,6 +28,15 @@ issueCommand: |
     followed by what was verified and how (command + result), anything
     intentionally left open, and the PR link.
 defaultTabs:
+  # Orca launches these tabs BEFORE the setup tab — verified in the 1.4 bundle,
+  # which awaits every defaultTab and only then spawns setup. On a fresh lane that
+  # means running before `bun install` has started, so the tab died instantly on a
+  # binary that did not exist yet. Each tab now waits for setup's marker, and runs
+  # regardless after the cap so a failed or skipped setup still shows a real error.
+  # The cap is above the 120s hook timeout: giving up while setup is still legally
+  # running would reintroduce the bug it fixes. The main worktree never runs setup,
+  # so it short-circuits on git-dir == git-common-dir and waits for nothing.
   - title: lint
-    command: bun run lint
+    command: |-
+        g="$(git rev-parse --git-dir 2>/dev/null)"; [ "$g" = "$(git rev-parse --git-common-dir 2>/dev/null)" ] || { i=0; while [ ! -e "$g/orca-setup-done" ] && [ "$i" -lt 150 ]; do sleep 1; i=$((i+1)); done; [ -e "$g/orca-setup-done" ] || echo "orca-tab: gave up waiting ${i}s for setup - it may have failed or been skipped"; }; bun run lint
     color: "#22c55e"
