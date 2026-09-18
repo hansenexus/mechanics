@@ -25,9 +25,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# On the estate's Hetzner runners since 2026-09-17: the org's 3000 included Actions
+# minutes ran out at 16:57 UTC that day and every GitHub-hosted job in hansenexus
+# stopped starting. The spending limit stays at $0.
+# Ruling: dec_2026-09-17_global-ci-on-hetzner-fleet-no-hosted-minutes
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, hetzner]
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
@@ -46,7 +50,7 @@ jobs:
         run: bun run test
 
   tarball:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, hetzner]
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
@@ -62,23 +66,23 @@ jobs:
         run: |
           set -euo pipefail
           bun run build
-          npm pack --pack-destination /tmp
-          ls -l /tmp/*.tgz
+          npm pack --pack-destination "$RUNNER_TEMP"
+          ls -l "$RUNNER_TEMP"/*.tgz
 
       - name: Template smoke against the installed artifact
         run: |
           set -euo pipefail
-          mkdir -p /tmp/consumer && cd /tmp/consumer
+          mkdir -p "$RUNNER_TEMP/consumer" && cd "$RUNNER_TEMP/consumer"
           npm init -y >/dev/null
-          npm i /tmp/hansenexus-mechanics-*.tgz >/dev/null
+          npm i "$RUNNER_TEMP"/hansenexus-mechanics-*.tgz >/dev/null
           cp -R node_modules/@hansenexus/mechanics/template/. .
           npx mechanics check --app=example
           npx mechanics build --all --check
-          npx mechanics report --html --out=/tmp/report.html
-          test -s /tmp/report.html
+          npx mechanics report --html --out="$RUNNER_TEMP/report.html"
+          test -s "$RUNNER_TEMP/report.html"
 
   dist:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, hetzner]
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
