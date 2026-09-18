@@ -60,7 +60,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, hetzner]
     permissions:
       contents: write # create the GitHub release
       id-token: write # provenance attestation
@@ -118,11 +118,11 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: |
           set -o pipefail
-          if npm publish --access public --dry-run 2>&1 | tee /tmp/publish.log; then
+          if npm publish --access public --dry-run 2>&1 | tee "$RUNNER_TEMP/publish.log"; then
             echo "dry run clean — this version is publishable"
             exit 0
           fi
-          if grep -q "cannot publish over the previously published versions" /tmp/publish.log; then
+          if grep -q "cannot publish over the previously published versions" "$RUNNER_TEMP/publish.log"; then
             echo "::notice::Authenticated to npm and the tarball is well-formed."
             echo "::notice::Version $(node -p "require('./package.json').version") is already published — bump before releasing."
             exit 0

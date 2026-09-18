@@ -49,7 +49,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, hetzner]
     steps:
       - uses: actions/checkout@v5
 
@@ -76,7 +76,7 @@ jobs:
     # PR is to catch a broken site before it is merged, not to preview it.
     if: github.event_name != 'pull_request'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, hetzner]
     permissions:
       pages: write
       id-token: write
