@@ -103,8 +103,7 @@ trailing commas). `any` and non-null assertions are errors, not warnings.
 
 ## Git and releases
 
-Branch off `main`, push to **GitHub only** — `forge.hansenexus.dev` is a read-only
-mirror whose nightly sync force-wipes anything pushed to it. Open a PR; do not merge
+Branch off `main`, push to `origin` (GitHub, the only remote). Open a PR; do not merge
 without being asked.
 
 Releases publish from CI over npm Trusted Publishing on a `v<version>` tag. Two

@@ -102,10 +102,10 @@ export type DispatchPlan = {
  * This used to sniff for a remote named `forge` and prefer it, from the
  * forge-primary period when `origin` was the GitHub CI mirror and a branch
  * there was a policy violation. GitHub became primary again on 2026-08-18 and
- * the push-mirror was deleted, but the `forge` remote was deliberately KEPT on
- * every checkout — forge is still a live bot-facing API. So the old sniff now
- * matches everywhere and would quietly publish every dispatch branch and PR to
- * the plane nobody reviews.
+ * forge was retired outright a week later, so `origin` is the only remote a
+ * checkout has — and any leftover `forge` remote points at a host that no
+ * longer answers. A sniff for it could only ever publish somewhere nobody
+ * reviews, or fail.
  *
  * `run` and `repoRoot` stay in the signature: callers pass them, and the
  * decision belongs here rather than being inlined at the call site, so

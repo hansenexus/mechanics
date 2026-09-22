@@ -6,7 +6,7 @@ import { orderYaml, parseOrder } from "./docket-order";
 const BASE_INPUT = {
   title: "board follow-up",
   today: "2026-08-18",
-  base: "forge/master",
+  base: "origin/master",
   criteria: ["tests green"],
   withPush: false,
   withPr: false,
