@@ -120,18 +120,23 @@ describe("planDispatch", () => {
   });
 
   it("plans the push against the requested remote, not a hardcoded origin", () => {
-    const plan = planDispatch({ ...BASE, remote: "forge", base: "forge/master", withPr: true });
-    expect(plan.remote).toBe("forge");
+    const plan = planDispatch({
+      ...BASE,
+      remote: "upstream",
+      base: "upstream/master",
+      withPr: true,
+    });
+    expect(plan.remote).toBe("upstream");
     const push = plan.steps.find((s) => s.id === "push");
-    expect(push?.label).toBe(`git push -u forge ${plan.branch}`);
+    expect(push?.label).toBe(`git push -u upstream ${plan.branch}`);
   });
 });
 
 describe("pickPushRemote", () => {
   it("publishes to origin even when a forge remote exists", async () => {
-    // The forge remote is still present on every checkout (forge is a live bot
-    // API), so the old "prefer forge" sniff would now match everywhere and
-    // publish dispatch branches to the plane nobody reviews.
+    // A leftover `forge` remote on an old checkout points at a retired host, so
+    // the old "prefer forge" sniff could only publish dispatch branches where
+    // nobody reviews them. Git is not asked which remotes exist at all.
     const remote = await pickPushRemote(async () => {
       throw new Error("git should not be consulted at all");
     }, "/repos/app");
@@ -314,9 +319,14 @@ describe("executeDispatch", () => {
   });
 
   it("pushes to the plan's remote and strips that prefix off the PR base", async () => {
-    // The forge-primary case: origin is the GitHub CI mirror, forge is the
-    // Forgejo primary. Nothing may touch origin.
-    const plan = planDispatch({ ...BASE, remote: "forge", base: "forge/master", withPr: true });
+    // The mirror case: origin is a read-only mirror and the primary lives on a
+    // second remote. Nothing may touch origin.
+    const plan = planDispatch({
+      ...BASE,
+      remote: "upstream",
+      base: "upstream/master",
+      withPr: true,
+    });
     let received: { base: string } | undefined;
     await executeDispatch(
       plan,
@@ -331,7 +341,7 @@ describe("executeDispatch", () => {
         },
       })
     );
-    expect(calls.some((c) => c.join(" ").includes("push -u forge"))).toBe(true);
+    expect(calls.some((c) => c.join(" ").includes("push -u upstream"))).toBe(true);
     expect(calls.some((c) => c.join(" ").includes("push -u origin"))).toBe(false);
     expect(received?.base).toBe("master");
   });
