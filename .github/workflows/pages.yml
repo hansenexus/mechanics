@@ -49,13 +49,16 @@ concurrency:
 
 jobs:
   build:
-    runs-on: [self-hosted, linux, x64, hetzner]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       # The root install is not optional: the report step runs `bun cli.ts`,
       # which needs the CLI's own dependencies.
@@ -76,7 +79,7 @@ jobs:
     # PR is to catch a broken site before it is merged, not to preview it.
     if: github.event_name != 'pull_request'
     needs: build
-    runs-on: [self-hosted, linux, x64, hetzner]
+    runs-on: ubuntu-latest
     permissions:
       pages: write
       id-token: write
