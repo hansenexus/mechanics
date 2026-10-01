@@ -60,7 +60,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: [self-hosted, linux, x64, hetzner]
+    runs-on: ubuntu-latest
     permissions:
       contents: write # create the GitHub release
       id-token: write # provenance attestation
