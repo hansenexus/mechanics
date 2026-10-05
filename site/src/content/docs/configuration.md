@@ -37,6 +37,8 @@ manifestsDir: .mechanics/manifests
 | `manifestsDir` | where committed manifests live. Generated, drift-gated, never hand-edited |
 | `adapters` | repo-level default when an app does not override it |
 | `surfaces` | repo-level default, same |
+| `adapterOptions` | per-adapter options: `convex.dir`, `convex.wrappers`, `nextjs-app-router.appDir`. See [Adapters](/adapters/#pointing-the-built-ins-at-your-layout) |
+| `apps[].adapterOptions` | an app's override, replacing the repo-level block per adapter |
 
 Declare **exactly one** of `appsDir` and `apps`. A repo that declared both would
 have two answers to "what apps are there", and the discovered set would silently

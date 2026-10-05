@@ -107,9 +107,28 @@ export function normalizeRoutePattern(pattern: string): string {
   return `/${segs.join("/")}`.replace(/\/$/, "") || "/";
 }
 
-/** `src/app`-relative page file → normalized route (`(dashboard)/observe/page.tsx` → `/observe`). */
+/** App-dir-relative page file → normalized route (`(dashboard)/observe/page.tsx` → `/observe`). */
 export function pageFileToRoute(rel: string): string {
   return normalizeRoutePattern(`/${rel.split("/").slice(0, -1).join("/")}`);
+}
+
+/** Options for `nextjs-app-router`, from `adapterOptions` in `mechanics.config.yaml`. */
+export interface NextjsAppRouterAdapterOptions {
+  /**
+   * App-relative directory holding the App Router tree. Defaults to `src/app`,
+   * which is every app in a monorepo laid out as `apps/<slug>/src/app`. A
+   * single-app repo whose Next app sits deeper (`apps/web/src/app` with the
+   * repo root as the mechanics app) has no other way to say so: the routes
+   * live under the app, just not where the default looks, and the inventory
+   * silently came back empty.
+   */
+  appDir?: string;
+}
+
+/** `"./src/app/"` → `"src/app/"`; `"."` → `""` — the prefix every file test uses. */
+function dirPrefix(dir: string): string {
+  const posix = dir.split("\\").join("/").replace(/^\.\//, "").replace(/\/+$/, "");
+  return posix === "." || posix === "" ? "" : `${posix}/`;
 }
 
 /**
@@ -118,7 +137,7 @@ export function pageFileToRoute(rel: string): string {
  * cannot see. Both paths run through the same normalizer, so the two sources
  * cannot disagree about shape.
  */
-async function nextjsRoutes(ctx: AdapterContext): Promise<string[]> {
+async function nextjsRoutes(ctx: AdapterContext, prefix: string): Promise<string[]> {
   const manifestPath = path.join(
     ctx.repoRoot,
     "packages",
@@ -132,33 +151,35 @@ async function nextjsRoutes(ctx: AdapterContext): Promise<string[]> {
     };
     return (manifest.routes ?? []).map((r) => normalizeRoutePattern(r.pattern));
   }
-  return ctx.files
-    .filter(
-      (f) => f.startsWith("src/app/") && /\/page\.tsx?$/.test(f) && !f.startsWith("src/app/api/")
-    )
-    .map((f) => pageFileToRoute(f.replace(/^src\/app\//, "")));
+  return nextjsPageFiles(ctx, prefix).map(([route]) => route);
 }
 
 /** Page files → the route each one serves. The file IS the provenance. */
-function nextjsPageFiles(ctx: AdapterContext): Array<[route: string, file: string]> {
+function nextjsPageFiles(
+  ctx: AdapterContext,
+  prefix: string
+): Array<[route: string, file: string]> {
   return ctx.files
     .filter(
-      (f) => f.startsWith("src/app/") && /\/page\.tsx?$/.test(f) && !f.startsWith("src/app/api/")
+      (f) => f.startsWith(prefix) && /\/page\.tsx?$/.test(f) && !f.startsWith(`${prefix}api/`)
     )
-    .map((f) => [pageFileToRoute(f.replace(/^src\/app\//, "")), f]);
+    .map((f) => [pageFileToRoute(f.slice(prefix.length)), f]);
 }
 
 /** API route handlers → the endpoint each one serves. */
-function nextjsApiFiles(ctx: AdapterContext): Array<[route: string, file: string]> {
+function nextjsApiFiles(ctx: AdapterContext, prefix: string): Array<[route: string, file: string]> {
   return ctx.files
-    .filter((f) => f.startsWith("src/app/api/") && /\/route\.tsx?$/.test(f))
+    .filter((f) => f.startsWith(`${prefix}api/`) && /\/route\.tsx?$/.test(f))
     .map((f) => [
-      normalizeRoutePattern(`/${f.replace(/^src\/app\//, "").replace(/\/route\.tsx?$/, "")}`),
+      normalizeRoutePattern(`/${f.slice(prefix.length).replace(/\/route\.tsx?$/, "")}`),
       f,
     ]);
 }
 
-export function createNextjsAppRouterAdapter(): SurfaceAdapter {
+export function createNextjsAppRouterAdapter(
+  options: NextjsAppRouterAdapterOptions = {}
+): SurfaceAdapter {
+  const prefix = dirPrefix(options.appDir ?? "src/app");
   return {
     name: "nextjs-app-router",
     kinds: [
@@ -167,8 +188,8 @@ export function createNextjsAppRouterAdapter(): SurfaceAdapter {
     ],
     async inventory(ctx) {
       return {
-        route: await nextjsRoutes(ctx),
-        "api-route": nextjsApiFiles(ctx).map(([route]) => route),
+        route: await nextjsRoutes(ctx, prefix),
+        "api-route": nextjsApiFiles(ctx, prefix).map(([route]) => route),
       };
     },
     async provenance(ctx) {
@@ -177,8 +198,8 @@ export function createNextjsAppRouterAdapter(): SurfaceAdapter {
       // route only present there is one this cannot answer for, and it is
       // simply absent from the map.
       return {
-        route: groupPairs(nextjsPageFiles(ctx)),
-        "api-route": groupPairs(nextjsApiFiles(ctx)),
+        route: groupPairs(nextjsPageFiles(ctx, prefix)),
+        "api-route": groupPairs(nextjsApiFiles(ctx, prefix)),
       };
     },
   };
@@ -199,12 +220,66 @@ function groupPairs(pairs: Array<[string, string]>): Record<string, string[]> {
 // convex
 // ---------------------------------------------------------------------------
 
-const CONVEX_FN_RE = /export\s+const\s+(\w+)\s*=\s*(?:query|mutation|action)\s*\(/g;
+/** The builders Convex itself exports for public functions. */
+const CONVEX_PUBLIC_BUILDERS = ["query", "mutation", "action"] as const;
 const CRON_NAME_RE =
   /crons\.(?:interval|cron|hourly|daily|weekly|monthly)\(\s*["'`]([^"'`]+)["'`]/g;
 const HTTP_PATH_RE = /path:\s*["'`]([^"'`]+)["'`]/g;
 
-export function createConvexAdapter(): SurfaceAdapter {
+/** Options for `convex`, from `adapterOptions` in `mechanics.config.yaml`. */
+export interface ConvexAdapterOptions {
+  /** App-relative Convex functions directory. Defaults to `convex`. */
+  dir?: string;
+  /**
+   * Extra builder names whose exports count as public functions, on top of
+   * `query`/`mutation`/`action`.
+   *
+   * A codebase that authorizes every handler usually does it by wrapping the
+   * builders (`spaceQuery`, `publicMutation`), and then not one of its public
+   * functions matches the three built-in names — the inventory reads zero and
+   * coverage looks complete for the wrong reason. There is no way to tell a
+   * public wrapper from an internal one by its name, so the list is explicit:
+   * `internalQuery` and friends are never counted unless someone writes them
+   * down here, which keeps the default answer the one Convex itself gives.
+   */
+  wrappers?: string[];
+}
+
+/**
+ * `export const <fn> = <builder>(` for the given builder names.
+ *
+ * Built per adapter rather than shared, because the names come from config.
+ * The schema already refuses anything that is not a JS identifier, and every
+ * name is escaped anyway: a `$` is a legal identifier character and a regex
+ * anchor, and this is the one place a config string becomes a pattern.
+ */
+export function convexFunctionRegExp(wrappers: readonly string[] = []): RegExp {
+  const names = [...new Set([...CONVEX_PUBLIC_BUILDERS, ...wrappers])].map((n) =>
+    n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  );
+  return new RegExp(`export\\s+const\\s+(\\w+)\\s*=\\s*(?:${names.join("|")})\\s*\\(`, "g");
+}
+
+export function createConvexAdapter(options: ConvexAdapterOptions = {}): SurfaceAdapter {
+  const prefix = dirPrefix(options.dir ?? "convex");
+  const fnRe = convexFunctionRegExp(options.wrappers);
+  const cronsFile = `${prefix}crons.ts`;
+  const httpFile = `${prefix}http.ts`;
+
+  // `<path under dir>.<fn>`, the shape Convex's own `api.<path>.<fn>` uses —
+  // so `modules/lexilink/status.get` for `convex/modules/lexilink/status.ts`.
+  const scanFunctions = async (ctx: AdapterContext): Promise<Array<[string, string]>> => {
+    const out: Array<[string, string]> = [];
+    for (const rel of convexSourceFiles(ctx, prefix)) {
+      const content = await fs.readFile(path.join(ctx.appDir, rel), "utf8");
+      const base = rel.slice(prefix.length).replace(/\.ts$/, "");
+      for (const m of content.matchAll(fnRe)) {
+        if (m[1]) out.push([`${base}.${m[1]}`, rel]);
+      }
+    }
+    return out;
+  };
+
   return {
     name: "convex",
     kinds: [
@@ -213,40 +288,24 @@ export function createConvexAdapter(): SurfaceAdapter {
       { kind: "http-endpoint", label: "HTTP endpoint", legacyClaimKey: "httpEndpoints" },
     ],
     async inventory(ctx) {
-      const convexFunctions: string[] = [];
-      const convexFiles = convexSourceFiles(ctx);
-      for (const rel of convexFiles) {
-        const content = await fs.readFile(path.join(ctx.appDir, rel), "utf8");
-        const base = rel.replace(/^convex\//, "").replace(/\.ts$/, "");
-        for (const m of content.matchAll(CONVEX_FN_RE)) {
-          if (m[1]) convexFunctions.push(`${base}.${m[1]}`);
-        }
-      }
-
       return {
-        "convex-function": convexFunctions,
-        cron: await scanFile(ctx, "convex/crons.ts", CRON_NAME_RE),
-        "http-endpoint": await scanFile(ctx, "convex/http.ts", HTTP_PATH_RE),
+        "convex-function": (await scanFunctions(ctx)).map(([item]) => item),
+        cron: await scanFile(ctx, cronsFile, CRON_NAME_RE),
+        "http-endpoint": await scanFile(ctx, httpFile, HTTP_PATH_RE),
       };
     },
     async provenance(ctx) {
-      // `<module>.<fn>` came out of `convex/<module>.ts` by construction, and
+      // `<module>.<fn>` came out of `<dir>/<module>.ts` by construction, and
       // crons and HTTP endpoints are only ever scanned out of their one
       // declaring file. Nothing here is inferred.
       const fns: Record<string, string[]> = {};
-      for (const rel of convexSourceFiles(ctx)) {
-        const content = await fs.readFile(path.join(ctx.appDir, rel), "utf8");
-        const base = rel.replace(/^convex\//, "").replace(/\.ts$/, "");
-        for (const m of content.matchAll(CONVEX_FN_RE)) {
-          if (m[1]) fns[`${base}.${m[1]}`] = [rel];
-        }
-      }
+      for (const [item, rel] of await scanFunctions(ctx)) fns[item] = [rel];
       const single = async (rel: string, re: RegExp) =>
         Object.fromEntries((await scanFile(ctx, rel, re)).map((item) => [item, [rel]]));
       return {
         "convex-function": fns,
-        cron: await single("convex/crons.ts", CRON_NAME_RE),
-        "http-endpoint": await single("convex/http.ts", HTTP_PATH_RE),
+        cron: await single(cronsFile, CRON_NAME_RE),
+        "http-endpoint": await single(httpFile, HTTP_PATH_RE),
       };
     },
   };
@@ -255,15 +314,15 @@ export function createConvexAdapter(): SurfaceAdapter {
 /**
  * Convex modules that are a public surface. `_generated` is codegen and
  * `lib/` is helpers — neither is claimable, so counting them would only
- * inflate the unclaimed list.
+ * inflate the unclaimed list. Both are read relative to the configured dir.
  */
-function convexSourceFiles(ctx: AdapterContext): string[] {
+function convexSourceFiles(ctx: AdapterContext, prefix: string): string[] {
   return ctx.files.filter(
     (f) =>
-      f.startsWith("convex/") &&
+      f.startsWith(prefix) &&
       f.endsWith(".ts") &&
-      !f.startsWith("convex/_generated/") &&
-      !f.startsWith("convex/lib/") &&
+      !f.startsWith(`${prefix}_generated/`) &&
+      !f.startsWith(`${prefix}lib/`) &&
       !f.endsWith(".test.ts") &&
       !f.endsWith(".d.ts")
   );

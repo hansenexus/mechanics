@@ -107,6 +107,44 @@ const surfaceSpecSchema = z
   .strict();
 
 /**
+ * An app-relative directory. Absolute paths and `..` are refused: the adapters
+ * only ever see files under the app root, so a dir outside it would not fail,
+ * it would just find nothing — the exact silent zero these options exist to fix.
+ */
+const appRelativeDir = z
+  .string()
+  .min(1)
+  .refine((d) => !d.startsWith("/") && !/^[A-Za-z]:/.test(d), "must be app-relative, not absolute")
+  .refine((d) => !d.split(/[\\/]/).includes(".."), "must stay inside the app (no `..`)");
+
+/**
+ * A builder name. It is turned into a regex alternative, so anything that is
+ * not a plain JS identifier is refused here rather than escaped into a
+ * pattern nobody meant.
+ */
+const builderName = z
+  .string()
+  .regex(/^[A-Za-z_$][A-Za-z0-9_$]*$/, "must be a JavaScript identifier (spaceQuery, …)");
+
+const adapterOptionsSchema = z
+  .object({
+    convex: z
+      .object({
+        dir: appRelativeDir.optional(),
+        wrappers: z.array(builderName).optional(),
+      })
+      .strict()
+      .optional(),
+    "nextjs-app-router": z
+      .object({
+        appDir: appRelativeDir.optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+/**
  * `mechanics.config.yaml`. Exactly one of `appsDir` (one dir per app) or
  * `apps` (explicit entries) — a repo that declared both would have two answers
  * to "what apps are there", and the discovered set would silently win.
@@ -122,6 +160,7 @@ export const repoConfigSchema = z
             dir: z.string().min(1),
             adapters: z.array(z.string().min(1)).optional(),
             surfaces: z.array(surfaceSpecSchema).optional(),
+            adapterOptions: adapterOptionsSchema.optional(),
           })
           .strict()
       )
@@ -129,6 +168,7 @@ export const repoConfigSchema = z
     manifestsDir: z.string().min(1).default("packages/mechanics/manifests"),
     adapters: z.array(z.string().min(1)).default(["nextjs-app-router", "convex"]),
     surfaces: z.array(surfaceSpecSchema).default([]),
+    adapterOptions: adapterOptionsSchema.default({}),
   })
   .strict()
   .refine((c) => (c.appsDir === undefined) !== (c.apps.length === 0), {

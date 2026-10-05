@@ -32,12 +32,16 @@ import {
 } from "./adapters";
 import { CONFIG_FILENAME, REPO_ROOT } from "./fsutil";
 import { formatZodError, repoConfigSchema } from "./schema";
-import type { RepoMechanicsConfig } from "./types";
+import type { RepoAdapterOptions, RepoMechanicsConfig } from "./types";
 
-/** Built-in adapters, by the name config refers to them by. */
-const BUILTIN_ADAPTERS: Record<string, () => SurfaceAdapter> = {
-  "nextjs-app-router": createNextjsAppRouterAdapter,
-  convex: createConvexAdapter,
+/**
+ * Built-in adapters, by the name config refers to them by. Each factory picks
+ * its own block out of the app's effective `adapterOptions`; an adapter with
+ * no options simply ignores the argument.
+ */
+const BUILTIN_ADAPTERS: Record<string, (options: RepoAdapterOptions) => SurfaceAdapter> = {
+  "nextjs-app-router": (o) => createNextjsAppRouterAdapter(o["nextjs-app-router"]),
+  convex: (o) => createConvexAdapter(o.convex),
 };
 
 export const BUILTIN_ADAPTER_NAMES = Object.keys(BUILTIN_ADAPTERS).sort();
@@ -49,6 +53,7 @@ const DEFAULT_CONFIG: RepoMechanicsConfig = {
   manifestsDir: "packages/mechanics/manifests",
   adapters: ["nextjs-app-router", "convex"],
   surfaces: [],
+  adapterOptions: {},
 };
 
 export interface AppLayout {
@@ -80,6 +85,8 @@ export interface RepoLayout {
    */
   adapters: string[];
   surfaces: GlobSurfaceSpec[];
+  /** Repo-level adapter options, applied to every discovered app for the same reason. */
+  adapterOptions: RepoAdapterOptions;
 }
 
 const CACHE = new Map<string, RepoLayout>();
@@ -120,22 +127,57 @@ function buildLayout(repoRoot: string, config: RepoMechanicsConfig): RepoLayout 
     manifestsDir: normalizeDir(config.manifestsDir),
     adapters: config.adapters,
     surfaces: config.surfaces,
+    adapterOptions: config.adapterOptions,
   };
 
   if (config.apps.length > 0) {
     const apps = new Map<string, AppLayout>();
+    // `adapterOptions` for an adapter the app does not run is an ERROR, not
+    // ignored. A block that configures nothing is almost always a typo'd
+    // adapter list or an app that was meant to run the adapter, and ignoring it
+    // reproduces exactly the failure the options exist to fix: an inventory
+    // that reads empty and coverage that looks complete. An app's OWN block
+    // must match its adapters; a repo-level block is a default, so an app that
+    // does not use it is fine as long as SOME app does.
+    const readRepoOptions = new Set<string>();
     for (const entry of config.apps) {
+      const names = entry.adapters ?? config.adapters;
+      const own = entry.adapterOptions ?? {};
       apps.set(entry.slug, {
         slug: entry.slug,
         dir: normalizeDir(entry.dir),
-        adapters: resolveAdapters(
-          entry.adapters ?? config.adapters,
-          entry.surfaces ?? config.surfaces,
-          entry.slug
-        ),
+        adapters: resolveAdapters(names, entry.surfaces ?? config.surfaces, entry.slug, {
+          ...config.adapterOptions,
+          ...own,
+        }),
       });
+      for (const key of Object.keys(own)) {
+        if (!names.includes(key)) {
+          throw new Error(
+            `${CONFIG_FILENAME}: app "${entry.slug}" sets adapterOptions.${key} but does not run the "${key}" adapter — its adapters are: ${names.join(", ") || "(none)"}`
+          );
+        }
+      }
+      for (const key of Object.keys(config.adapterOptions)) {
+        if (!(key in own) && names.includes(key)) readRepoOptions.add(key);
+      }
+    }
+    for (const key of Object.keys(config.adapterOptions)) {
+      if (!readRepoOptions.has(key)) {
+        throw new Error(
+          `${CONFIG_FILENAME}: adapterOptions.${key} applies to no app — every app either does not run the "${key}" adapter or sets its own adapterOptions.${key}`
+        );
+      }
     }
     return { ...base, apps, appsDir: null };
+  }
+
+  for (const key of Object.keys(config.adapterOptions)) {
+    if (!config.adapters.includes(key)) {
+      throw new Error(
+        `${CONFIG_FILENAME}: adapterOptions.${key} is set but "${key}" is not in adapters: [${config.adapters.join(", ")}]`
+      );
+    }
   }
 
   return {
@@ -151,7 +193,12 @@ function normalizeDir(dir: string): string {
   return posix === "." ? "" : posix;
 }
 
-function resolveAdapters(names: string[], surfaces: GlobSurfaceSpec[], slug: string) {
+function resolveAdapters(
+  names: string[],
+  surfaces: GlobSurfaceSpec[],
+  slug: string,
+  options: RepoAdapterOptions
+) {
   const adapters: SurfaceAdapter[] = [];
   for (const name of names) {
     const factory = BUILTIN_ADAPTERS[name];
@@ -161,7 +208,7 @@ function resolveAdapters(names: string[], surfaces: GlobSurfaceSpec[], slug: str
           `\n  (declare project-specific surfaces under "surfaces:" instead — they are served by generic-glob)`
       );
     }
-    adapters.push(factory());
+    adapters.push(factory(options));
   }
   if (surfaces.length > 0) adapters.push(createGenericGlobAdapter(surfaces));
   return adapters;
@@ -185,7 +232,7 @@ export function appLayout(appSlug: string, repoRoot = REPO_ROOT): AppLayout {
     return {
       slug: appSlug,
       dir: joinRel(layout.appsDir ?? "apps", appSlug),
-      adapters: resolveAdapters(layout.adapters, layout.surfaces, appSlug),
+      adapters: resolveAdapters(layout.adapters, layout.surfaces, appSlug, layout.adapterOptions),
     };
   }
   const found = layout.apps.get(appSlug);
@@ -194,6 +241,22 @@ export function appLayout(appSlug: string, repoRoot = REPO_ROOT): AppLayout {
     throw new Error(`${CONFIG_FILENAME}: no app "${appSlug}" — declared apps are: ${declared}`);
   }
   return found;
+}
+
+/**
+ * The slug of the only app, when `mechanics.config.yaml` declares exactly one
+ * under `apps:` — otherwise null.
+ *
+ * Lets the corpus commands run without `--app` in a single-app repo, where
+ * asking for the slug is a question with one possible answer. Discovery mode
+ * never qualifies, even with one directory under `appsDir`: a monorepo that
+ * happens to have one app today is still a monorepo, and a default that flips
+ * to an error the day a second app lands is worse than no default.
+ */
+export function soleDeclaredApp(repoRoot = REPO_ROOT): string | null {
+  const { apps } = loadLayout(repoRoot);
+  if (!apps || apps.size !== 1) return null;
+  return [...apps.keys()][0] ?? null;
 }
 
 /** Absolute path to the app root. */

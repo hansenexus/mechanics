@@ -30,7 +30,7 @@ import { inventoryRoutes } from "./coverage";
 import { checkDecisions } from "./decisions";
 import { REPO_ROOT } from "./fsutil";
 import { mapImpact } from "./impact";
-import { appDir, appPath } from "./layout";
+import { appDir, appPath, soleDeclaredApp } from "./layout";
 import { buildManifest, emitManifest, loadManifest, onboardedApps } from "./manifest";
 import { planScaffold, stubPath } from "./scaffold";
 import { validateScreens } from "./screens";
@@ -204,8 +204,14 @@ async function main() {
   }
 }
 
+/**
+ * `--all`, else `--app`, else the one app a single-app config declares. With
+ * zero or several declared apps there is no answer to default to, and the
+ * error stays.
+ */
 async function resolveSlugs(args: Args): Promise<string[]> {
-  const slugs = args.all ? await onboardedApps() : args.app ? [args.app] : [];
+  const sole = args.all || args.app ? null : soleDeclaredApp(REPO_ROOT);
+  const slugs = args.all ? await onboardedApps() : args.app ? [args.app] : sole ? [sole] : [];
   if (slugs.length === 0) {
     console.error(`[mechanics] ${args.command}: pass --app=<slug> or --all`);
     process.exit(1);
@@ -1145,6 +1151,7 @@ function usage() {
       "  bun mechanics check --app=<slug> | --all       Validate corpus + waves + coverage",
       "  bun mechanics build --app=<slug> | --all        Regenerate committed manifest(s)",
       "  bun mechanics build --all --check               Drift gate (exit 1 if stale)",
+      "    (check/build/coverage/gaps/scaffold default to the app when the config declares exactly one)",
       "  bun mechanics coverage --app=<slug>             Coverage table + gaps + wave rollups",
       "  bun mechanics report --html [--out=<path>]      Coverage as one self-contained page",
       "  bun mechanics verify --app=<s> --wave=<w>       Run linked specs, merge into wave YAML",

@@ -7,7 +7,11 @@ Commands are shown as `mechanics …`. Under npm that is `npx mechanics …`; un
 Bun, `bunx mechanics …` or `bun mechanics …` in a repo that has it installed.
 
 Every command that operates on an app takes either `--app=<slug>` or, where
-noted, `--all`.
+noted, `--all`. In a repo whose `mechanics.config.yaml` declares exactly one app
+under `apps:` (what a single-app `init` writes), the commands that take
+`--app=<slug> | --all` — `check`, `build`, `coverage`, `gaps`, `scaffold` —
+default to that app when given neither. With several apps, or apps discovered
+under `appsDir`, they still ask.
 
 ## Setting up
 
