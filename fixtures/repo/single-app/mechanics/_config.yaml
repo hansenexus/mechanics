@@ -1,0 +1,4 @@
+testGlobs: []
+e2eRunner: bun-script
+coverage:
+  enforce: error

@@ -128,6 +128,11 @@ committed manifest. `--dry-run` shows the plan; `--no-ci`, `--no-mcp`,
 `--no-docket` opt out. Then replace the starter mechanic with real behaviours —
 `mechanics scaffold --app=<slug>` drafts a stub per unclaimed surface.
 
+When `mechanics.config.yaml` declares exactly one app under `apps:` — what a
+single-app `init` writes — `check`, `build`, `coverage`, `gaps` and `scaffold`
+default to it, so `mechanics check` is enough. With several apps, or apps
+discovered under `appsDir`, they still ask for `--app=<slug>` or `--all`.
+
 Two worked examples ship with the package, and they show opposite ends of a
 corpus's life:
 
@@ -147,7 +152,7 @@ corpus's life:
 | | |
 |---|---|
 | **Core** | parser, schema, manifest, coverage, waves, verify, CLI |
-| **Adapters** | `nextjs-app-router`, `convex`, `generic-glob` — plus the `SurfaceAdapter` seam, so a stack nobody wrote an adapter for declares its surfaces in config instead of forking |
+| **Adapters** | `nextjs-app-router`, `convex`, `generic-glob` — plus the `SurfaceAdapter` seam, so a stack nobody wrote an adapter for declares its surfaces in config instead of forking. [`adapterOptions`](#adapter-options) points the built-ins at a non-default layout |
 | **MCP** | six read tools over stdio: list, get, coverage, wave status, diff impact, decisions |
 | **Report** | `--html`: one file, no build step, no external request |
 | **TUI** | `mechanics tui` — the always-open view: drift, issues, runs, proposals, updates |
@@ -156,6 +161,26 @@ corpus's life:
 | **[Decisions](./spec/docket-1.md#decision-records)** | `.docket/decisions/` — ADRs retrievable by the file you are about to touch; an accepted record whose `affects.paths` matches nothing fails `check`, and two open runs deciding about one subsystem get flagged |
 | **[docket/1](./spec/docket-1.md)** | the run protocol — work orders with checkable exit criteria and an append-only event log, with [executable conformance vectors](./spec/docket-1.vectors.json) |
 | **[Plugin](./plugin/)** | three Claude Code skills: init, verify, gaps |
+
+### Adapter options
+
+The built-in adapters assume `src/app/` for the App Router and `convex/` with
+`query`/`mutation`/`action` for Convex. When a repo differs, say so in
+`mechanics.config.yaml` rather than absorbing an empty inventory:
+
+```yaml
+adapterOptions:
+  convex:
+    dir: convex                                  # app-relative; default "convex"
+    wrappers: [spaceQuery, spaceMutation]        # extra public builders, on top of query/mutation/action
+  nextjs-app-router:
+    appDir: apps/web/src/app                     # app-relative; default "src/app"
+```
+
+Set it at repo level, or per entry under `apps:` — an app's block for one
+adapter replaces the repo-level block for that adapter whole. Options for an
+adapter the app does not run are an error, not ignored. Details in the
+[adapters docs](https://mechanics.hansenexus.dev/adapters/).
 
 ## The two things it refuses to do
 

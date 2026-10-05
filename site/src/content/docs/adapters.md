@@ -75,6 +75,54 @@ surfaces:
 The adapters know Next.js and Convex; nothing but the config knows that
 `src/workers/` is a surface at all.
 
+## Pointing the built-ins at your layout
+
+The two built-in adapters assume a layout: the App Router under `src/app/`, and
+Convex functions in `convex/`, built with `query`, `mutation` or `action`. A
+repo that differs gets an empty inventory, not an error — so say where things
+are:
+
+```yaml
+adapterOptions:
+  convex:
+    dir: convex                 # app-relative; default "convex"
+    wrappers: [spaceQuery, spaceMutation, publicQuery]
+  nextjs-app-router:
+    appDir: apps/web/src/app    # app-relative; default "src/app"
+```
+
+| Option | Default | Effect |
+|---|---|---|
+| `convex.dir` | `convex` | where Convex functions live. `lib/`, `_generated/`, `*.test.ts` and `*.d.ts` are excluded relative to it, and `crons.ts` / `http.ts` are read from inside it |
+| `convex.wrappers` | `[]` | builder names counted as public functions **in addition to** `query`, `mutation`, `action` |
+| `nextjs-app-router.appDir` | `src/app` | the App Router tree. Routes, API routes (`<appDir>/api/`) and provenance all derive from it |
+
+A Convex item stays `<path under dir, without .ts>.<export>`, the shape of
+Convex's own `api.<path>.<fn>`: `export const get = spaceQuery({…})` in
+`convex/modules/lexilink/status.ts` is `modules/lexilink/status.get`.
+
+Wrappers are listed, never guessed. A codebase that authorizes every handler
+usually does it by wrapping the builders, and nothing about a name says whether
+the wrapper is public, so `internalQuery` and friends are only counted if you
+list them. Each name must be a JavaScript identifier; it matches exactly, so
+`spaceQuery` does not also match `spaceQueryAdmin`.
+
+The `packages/dev-routes/manifests/<slug>.routes.json` preference is unchanged:
+when that manifest exists, page routes come from it whatever `appDir` says.
+
+**Precedence.** `adapterOptions` sits at repo level and can be overridden per
+entry under `apps:`, like `adapters:` and `surfaces:`. The unit is one
+adapter's block: an app that sets `adapterOptions.convex` replaces the
+repo-level `convex` block whole (no field-by-field merge, so `wrappers: []`
+means none) and still inherits the repo-level `nextjs-app-router` block.
+
+**Options for an adapter that does not run are an error.** An app's own block
+for an adapter missing from its `adapters:` fails the load, and so does a
+repo-level block that no app ends up reading. A block that configures nothing
+is nearly always a mistake, and ignoring it would reproduce the silent empty
+inventory the options exist to prevent. Unknown keys fail too — the block is
+strict like the rest of the file.
+
 ## Why scanning is regex-based
 
 A real parse would catch exotic export styles that regexes miss, at the cost of

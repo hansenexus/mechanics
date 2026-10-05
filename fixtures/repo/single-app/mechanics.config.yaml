@@ -1,0 +1,13 @@
+# A single-app repo shaped like fachwerk: the mechanics app IS the repo root,
+# the Next app lives under apps/web/src/app, and Convex sits at the root with
+# public functions built by wrapper builders instead of query/mutation.
+apps:
+  - slug: solo
+    dir: .
+manifestsDir: .mechanics/manifests
+adapterOptions:
+  convex:
+    dir: convex
+    wrappers: [spaceQuery, spaceMutation]
+  nextjs-app-router:
+    appDir: apps/web/src/app

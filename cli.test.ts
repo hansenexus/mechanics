@@ -8,6 +8,8 @@
  */
 
 import { spawn } from "node:child_process";
+import { promises as fs } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -77,6 +79,53 @@ describe("cli entry", () => {
       "run",
     ]) {
       expect(stdout, `usage should mention '${cmd}'`).toContain(`mechanics ${cmd}`);
+    }
+  });
+});
+
+describe("cli: the app defaults in a single-app repo", () => {
+  /** Run from inside `cwd`, so the repo root is resolved from there. */
+  function mechanicsIn(cwd: string, args: string[]): Promise<Run> {
+    return new Promise((resolve, reject) => {
+      const child = spawn("bun", [CLI, ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+      let stdout = "";
+      let stderr = "";
+      child.stdout.on("data", (d) => {
+        stdout += d;
+      });
+      child.stderr.on("data", (d) => {
+        stderr += d;
+      });
+      child.on("error", reject);
+      child.on("close", (code) => resolve({ code: code ?? 0, stdout, stderr }));
+    });
+  }
+
+  it("runs check and coverage without --app when the config declares one app", async () => {
+    const cwd = path.join(HERE, "fixtures", "repo", "single-app");
+    const check = await mechanicsIn(cwd, ["check"]);
+    expect(check.stderr).not.toContain("pass --app");
+    expect(check.code).toBe(0);
+    expect(check.stdout).toContain("solo: 1 mechanics ok");
+
+    const coverage = await mechanicsIn(cwd, ["coverage"]);
+    expect(coverage.code).toBe(0);
+    expect(coverage.stdout).toContain("solo");
+  });
+
+  it("still refuses without --app when the config declares several apps", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "mechanics-cli-"));
+    try {
+      await fs.writeFile(
+        path.join(root, "mechanics.config.yaml"),
+        "apps:\n  - slug: a\n    dir: a\n  - slug: b\n    dir: b\nmanifestsDir: out\n",
+        "utf8"
+      );
+      const run = await mechanicsIn(root, ["check"]);
+      expect(run.code).toBe(1);
+      expect(run.stderr).toContain("check: pass --app=<slug> or --all");
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
     }
   });
 });

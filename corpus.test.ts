@@ -157,3 +157,34 @@ describe("kind-keyed claims", () => {
     expect(Object.keys(view?.claims ?? {})).toEqual(["api-route", "convex-function", "route"]);
   });
 });
+
+describe("single-app repo with adapterOptions (fixture)", () => {
+  // Shaped like fachwerk: the mechanics app is the repo root, the Next app
+  // lives under apps/web/src/app, and every public Convex function is built
+  // by a wrapper (`spaceQuery`) rather than by `query` itself. Without the
+  // options both inventories read empty and the claims below all dangle.
+  const SINGLE_ROOT = path.join(FIXTURE_ROOT, "single-app");
+
+  it("inventories the wrapped function and the deep route, and covers both claims", async () => {
+    const { manifest, errors, warnings } = await buildManifest("solo", SINGLE_ROOT);
+    expect(errors).toEqual([]);
+    expect(warnings).toEqual([]);
+    expect(manifest.coverage.route).toEqual({ total: 1, claimed: 1, ignored: 0, unclaimed: [] });
+    expect(manifest.coverage["api-route"]).toEqual({
+      total: 1,
+      claimed: 1,
+      ignored: 0,
+      unclaimed: [],
+    });
+    // `sweep` is an internalQuery and `lib/guards.helper` is a helper: neither counts.
+    expect(manifest.coverage["convex-function"]).toEqual({
+      total: 1,
+      claimed: 1,
+      ignored: 0,
+      unclaimed: [],
+    });
+    const inv = await inventoryAppKinds("solo", SINGLE_ROOT);
+    expect(inv.items.route).toEqual(["/classes"]);
+    expect(inv.items["convex-function"]).toEqual(["modules/x/y.get"]);
+  });
+});

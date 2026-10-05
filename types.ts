@@ -149,6 +149,24 @@ export interface RepoSurfaceSpec {
   globs: string[];
 }
 
+/**
+ * Per-adapter options, keyed by built-in adapter name. Only adapters that take
+ * options appear; any other key is a schema error rather than a silent no-op.
+ * Paths are app-relative, like every other path the adapters see.
+ */
+export interface RepoAdapterOptions {
+  convex?: {
+    /** Convex functions directory. Default `convex`. */
+    dir?: string;
+    /** Extra public builder names (`spaceQuery`), on top of query/mutation/action. */
+    wrappers?: string[];
+  };
+  "nextjs-app-router"?: {
+    /** App Router directory. Default `src/app`. */
+    appDir?: string;
+  };
+}
+
 /** One explicitly declared app in `mechanics.config.yaml`. */
 export interface RepoAppEntry {
   slug: string;
@@ -158,6 +176,11 @@ export interface RepoAppEntry {
   adapters?: string[];
   /** Glob surfaces for this app; falls back to the repo-level default. */
   surfaces?: RepoSurfaceSpec[];
+  /**
+   * Options for this app's adapters. Each adapter's block replaces the
+   * repo-level block for that adapter whole; blocks are not merged field by field.
+   */
+  adapterOptions?: RepoAdapterOptions;
 }
 
 /**
@@ -175,6 +198,8 @@ export interface RepoMechanicsConfig {
   adapters: string[];
   /** Default glob surfaces for apps that do not declare their own. */
   surfaces: RepoSurfaceSpec[];
+  /** Default adapter options, per adapter, for apps that do not set their own. */
+  adapterOptions: RepoAdapterOptions;
 }
 
 /** How a spec ↔ mechanic link was discovered. */

@@ -10,8 +10,17 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { buildInventory } from "./adapters";
 import { findRepoRoot } from "./fsutil";
-import { appAdapters, appDir, appLayout, appPath, clearLayoutCache, manifestsDir } from "./layout";
+import {
+  appAdapters,
+  appDir,
+  appLayout,
+  appPath,
+  clearLayoutCache,
+  manifestsDir,
+  soleDeclaredApp,
+} from "./layout";
 
 const made: string[] = [];
 
@@ -201,5 +210,200 @@ describe("layout: config errors name the fix", () => {
       "apps:\n  - slug: a\n    dir: .\n    adapters: [rails]\n"
     );
     expect(() => appLayout("a", root)).toThrow(/built-ins are: convex, nextjs-app-router/);
+  });
+});
+
+describe("layout: adapterOptions", () => {
+  /** Inventory one app's adapters against an in-memory file list. */
+  async function inventory(root: string, slug: string, files: string[]) {
+    return buildInventory(appAdapters(slug, root), {
+      appSlug: slug,
+      appDir: appDir(slug, root),
+      repoRoot: root,
+      files,
+    });
+  }
+
+  it("applies repo-level options to an explicit app", async () => {
+    const root = await tmp();
+    await write(
+      root,
+      "mechanics.config.yaml",
+      `apps:
+  - slug: solo
+    dir: .
+manifestsDir: out
+adapterOptions:
+  convex:
+    wrappers: [spaceQuery]
+  nextjs-app-router:
+    appDir: apps/web/src/app
+`
+    );
+    await write(root, "convex/x/y.ts", "export const get = spaceQuery({});\n");
+    const inv = await inventory(root, "solo", ["convex/x/y.ts", "apps/web/src/app/a/page.tsx"]);
+    expect(inv.items["convex-function"]).toEqual(["x/y.get"]);
+    expect(inv.items.route).toEqual(["/a"]);
+  });
+
+  it("applies repo-level options to discovered apps", async () => {
+    const root = await tmp();
+    await write(
+      root,
+      "mechanics.config.yaml",
+      `${MONOREPO}adapterOptions:\n  nextjs-app-router:\n    appDir: app\n`
+    );
+    const inv = await inventory(root, "console", ["app/orders/page.tsx", "src/app/x/page.tsx"]);
+    expect(inv.items.route).toEqual(["/orders"]);
+  });
+
+  it("lets an app replace one adapter's block whole and inherit the others", async () => {
+    // Same precedence as `adapters:`/`surfaces:` — the app's value wins — at
+    // the granularity of one adapter's block. Field-by-field merging would
+    // make `wrappers: []` unable to mean "none".
+    const root = await tmp();
+    await write(
+      root,
+      "mechanics.config.yaml",
+      `apps:
+  - slug: a
+    dir: a
+    adapterOptions:
+      convex:
+        dir: backend
+  - slug: b
+    dir: b
+manifestsDir: out
+adapterOptions:
+  convex:
+    wrappers: [spaceQuery]
+  nextjs-app-router:
+    appDir: web
+`
+    );
+    await write(
+      root,
+      "a/backend/m.ts",
+      "export const q = spaceQuery({});\nexport const p = query({});\n"
+    );
+    await write(root, "b/convex/m.ts", "export const q = spaceQuery({});\n");
+    const a = await inventory(root, "a", ["backend/m.ts", "web/r/page.tsx"]);
+    expect(a.items["convex-function"]).toEqual(["m.p"]);
+    expect(a.items.route).toEqual(["/r"]);
+    const b = await inventory(root, "b", ["convex/m.ts"]);
+    expect(b.items["convex-function"]).toEqual(["m.q"]);
+  });
+
+  it("rejects an unknown adapter key and an unknown option, strictly", async () => {
+    const root = await tmp();
+    await write(root, "mechanics.config.yaml", `${MONOREPO}adapterOptions:\n  rails: {}\n`);
+    expect(() => appLayout("x", root)).toThrow(/adapterOptions: Unrecognized key.*rails/);
+
+    clearLayoutCache();
+    await write(
+      root,
+      "mechanics.config.yaml",
+      `${MONOREPO}adapterOptions:\n  convex:\n    dirr: backend\n`
+    );
+    expect(() => appLayout("x", root)).toThrow(/adapterOptions\.convex: Unrecognized key.*dirr/);
+  });
+
+  it("refuses a wrapper that is not an identifier, and a dir outside the app", async () => {
+    const root = await tmp();
+    await write(
+      root,
+      "mechanics.config.yaml",
+      `${MONOREPO}adapterOptions:\n  convex:\n    wrappers: ["query|.*"]\n`
+    );
+    expect(() => appLayout("x", root)).toThrow(/wrappers\.0: must be a JavaScript identifier/);
+
+    for (const bad of ["../convex", "/abs/convex"]) {
+      clearLayoutCache();
+      await write(
+        root,
+        "mechanics.config.yaml",
+        `${MONOREPO}adapterOptions:\n  convex:\n    dir: "${bad}"\n`
+      );
+      expect(() => appLayout("x", root)).toThrow(/adapterOptions\.convex\.dir: must/);
+    }
+  });
+
+  it("refuses an app's own options for an adapter it does not run", async () => {
+    const root = await tmp();
+    await write(
+      root,
+      "mechanics.config.yaml",
+      `apps:
+  - slug: a
+    dir: .
+    adapters: [nextjs-app-router]
+    adapterOptions:
+      convex:
+        wrappers: [spaceQuery]
+manifestsDir: out
+`
+    );
+    expect(() => appLayout("a", root)).toThrow(
+      /app "a" sets adapterOptions\.convex but does not run the "convex" adapter/
+    );
+  });
+
+  it("allows a repo-level default some app ignores, but not one that no app reads", async () => {
+    const root = await tmp();
+    const config = (bAdapters: string) => `apps:
+  - slug: a
+    dir: a
+    adapters: [nextjs-app-router]
+  - slug: b
+    dir: b
+    adapters: ${bAdapters}
+manifestsDir: out
+adapterOptions:
+  convex:
+    wrappers: [spaceQuery]
+`;
+    await write(root, "mechanics.config.yaml", config("[convex]"));
+    expect(appAdapters("a", root).map((x) => x.name)).toEqual(["nextjs-app-router"]);
+
+    clearLayoutCache();
+    await write(root, "mechanics.config.yaml", config("[nextjs-app-router]"));
+    expect(() => appLayout("a", root)).toThrow(/adapterOptions\.convex applies to no app/);
+  });
+
+  it("refuses repo-level options for an adapter discovered apps do not run", async () => {
+    const root = await tmp();
+    await write(
+      root,
+      "mechanics.config.yaml",
+      `${MONOREPO}adapters: [nextjs-app-router]\nadapterOptions:\n  convex:\n    dir: backend\n`
+    );
+    expect(() => appLayout("x", root)).toThrow(
+      /adapterOptions\.convex is set but "convex" is not in adapters/
+    );
+  });
+});
+
+describe("soleDeclaredApp", () => {
+  it("names the app when exactly one is declared under apps:", async () => {
+    const root = await tmp();
+    await write(root, "mechanics.config.yaml", SOLO);
+    expect(soleDeclaredApp(root)).toBe("example");
+  });
+
+  it("is null with several declared apps, in discovery mode, and with no config", async () => {
+    const many = await tmp();
+    await write(
+      many,
+      "mechanics.config.yaml",
+      "apps:\n  - slug: a\n    dir: a\n  - slug: b\n    dir: b\n"
+    );
+    expect(soleDeclaredApp(many)).toBeNull();
+
+    const discovered = await tmp();
+    await write(discovered, "mechanics.config.yaml", MONOREPO);
+    await fs.mkdir(path.join(discovered, "apps", "only", "mechanics"), { recursive: true });
+    expect(soleDeclaredApp(discovered)).toBeNull();
+
+    expect(soleDeclaredApp(await tmp())).toBeNull();
   });
 });
