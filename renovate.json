@@ -1,0 +1,15 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Inlined from hansenexus/hn-infra//renovate/default (hn-infra#353), which is private and so cannot be extended from this public repo (#24). Keep the two in step by hand.",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "packageRules": [
+    {
+      "description": "One weekly PR for every GitHub Actions update, digest pins and pin-moves included.",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions",
+      "groupSlug": "github-actions",
+      "schedule": ["before 8am on Monday"]
+    }
+  ],
+  "timezone": "Europe/Berlin"
+}
